@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, BookOpen, LogOut, UserCog, MessageSquare, Wallet, Award, Calendar, UserCheck, Clock, FolderOpen, FileText } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { LayoutDashboard, Users, LogOut, UserCog, MessageSquare, Wallet, Award, UserCheck, Clock, FolderOpen, FileText, Calendar, BookOpen } from 'lucide-react';
+
 import api from '@/api/axios';
+
+interface UserProfile {
+  id: number;
+  first_name: string;
+  last_name: string;
+  role: string;
+}
 
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -32,9 +39,9 @@ export default function Layout() {
   const isActive = (path: string) => location.pathname === path;
 
   const canSeeDashboard = userProfile?.role === 'ADMIN' || userProfile?.role === 'DIRECTION';
-  const canSeeGrades = ['ADMIN', 'DIRECTION', 'ENSEIGNANT', 'ELEVE', 'PARENT'].includes(userProfile?.role);
-  const canSeeFinance = ['ADMIN', 'DIRECTION', 'COMPTABLE', 'PARENT'].includes(userProfile?.role);
-  const isStaff = ['ADMIN', 'DIRECTION'].includes(userProfile?.role);
+  const canSeeGrades = ['ADMIN', 'DIRECTION', 'ENSEIGNANT', 'ELEVE', 'PARENT'].includes(userProfile?.role || '');
+  const canSeeFinance = ['ADMIN', 'DIRECTION', 'COMPTABLE', 'PARENT'].includes(userProfile?.role || '');
+  const isStaff = ['ADMIN', 'DIRECTION'].includes(userProfile?.role || '');
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -66,7 +73,7 @@ export default function Layout() {
             {userProfile?.role === 'ELEVE' ? 'Mon Cahier de Texte' : 'Cahier de Texte'}
           </Link>
 
-          {['ADMIN', 'DIRECTION', 'ENSEIGNANT'].includes(userProfile?.role) && (
+          {['ADMIN', 'DIRECTION', 'ENSEIGNANT'].includes(userProfile?.role || '') && (
             <Link to="/pointage" className={`flex items-center px-4 py-3 rounded-lg transition-colors ${isActive('/pointage') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
               <Clock className="w-5 h-5 mr-3" />
               {userProfile?.role === 'ENSEIGNANT' ? 'Mon Pointage' : 'Pointage Heures'}
@@ -76,13 +83,13 @@ export default function Layout() {
           {canSeeGrades && (
             <Link to="/grades" className={`flex items-center px-4 py-3 rounded-lg transition-colors ${isActive('/grades') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
               <Award className="w-5 h-5 mr-3" />
-              {['ELEVE', 'PARENT'].includes(userProfile?.role) ? 'Mes Notes' : 'Saisie des Notes'}
+              {['ELEVE', 'PARENT'].includes(userProfile?.role || '') ? 'Mes Notes' : 'Saisie des Notes'}
             </Link>
           )}
 
           <Link to="/bulletins" className={`flex items-center px-4 py-3 rounded-lg transition-colors ${isActive('/bulletins') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
             <FileText className="w-5 h-5 mr-3" />
-            {['ELEVE', 'PARENT'].includes(userProfile?.role) ? 'Mes Bulletins' : 'Bulletins Officiels'}
+            {['ELEVE', 'PARENT'].includes(userProfile?.role || '') ? 'Mes Bulletins' : 'Bulletins Officiels'}
           </Link>
 
           {canSeeFinance && (

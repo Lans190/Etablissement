@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '@/api/axios';
-import { Settings as SettingsIcon, Save, Camera, Loader2, MapPin, Phone, Mail, Building, BookOpen, Plus, Trash2, User, Layers } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Camera, Loader2, MapPin, Phone, Mail, Building, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Settings() {

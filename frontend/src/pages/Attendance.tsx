@@ -4,8 +4,8 @@ import { CheckCircle, XCircle, Clock, Save, Users, Filter, Loader2, Calendar } f
 import { Button } from '@/components/ui/button';
 
 export default function AttendancePage() {
-  const [classrooms, setClassrooms] = useState([]);
-  const [enrollments, setEnrollments] = useState([]);
+  const [classrooms, setClassrooms] = useState<any[]>([]);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);

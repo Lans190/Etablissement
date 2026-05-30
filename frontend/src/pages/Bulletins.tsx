@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '@/api/axios';
-import { Award, FileText, Download, CheckCircle, Eye, Loader2, Send } from 'lucide-react';
+import { Download, CheckCircle, Eye, Loader2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Bulletins() {
@@ -15,7 +15,7 @@ export default function Bulletins() {
 
   const [userProfile] = useState(() => JSON.parse(localStorage.getItem('user_profile') || '{}'));
   const canManage = ['ADMIN', 'DIRECTION'].includes(userProfile?.role);
-  const isTeacher = userProfile?.role === 'ENSEIGNANT';
+
 
   const fetchData = async () => {
     setLoading(true);

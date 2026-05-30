@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '@/api/axios';
-import { Calendar, Plus, Trash2, Filter, Loader2, Clock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Plus, Trash2, Filter, Loader2, Clock } from 'lucide-react';
+
 
 const DAYS = ['LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI'];
 

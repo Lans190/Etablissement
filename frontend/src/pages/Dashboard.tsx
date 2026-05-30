@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import api from '@/api/axios';
 import { 
-  Users, GraduationCap, LayoutDashboard, Wallet, TrendingUp, 
-  ChevronRight, Calendar, Bell, Loader2, ArrowUpRight, ArrowDownRight, Building
+  Users, GraduationCap, LayoutDashboard, Loader2, ArrowUpRight, ArrowDownRight, Building
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, LineChart, Line 
+  PieChart, Pie, Cell 
 } from 'recharts';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -51,7 +50,6 @@ export default function Dashboard() {
   const stats = data.stats;
   const cycles = data.cycles || [];
   const classes = data.classes || [];
-  const recentPayments = data.recent_payments || [];
   
   // Données pour le graphique financier (Entrées vs Sorties)
   const financeData = [
@@ -139,7 +137,7 @@ export default function Dashboard() {
                     outerRadius={80}
                     paddingAngle={5}
                   >
-                    {cycles.map((entry: any, index: number) => (
+                    {cycles.map((_c: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

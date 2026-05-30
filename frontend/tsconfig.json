@@ -5,7 +5,10 @@
     { "path": "./tsconfig.node.json" }
   ],
   "compilerOptions": {
+    "skipLibCheck": true,
+    "strict": true,
     "baseUrl": ".",
+
     "paths": {
       "@/*": ["./src/*"]
     }
