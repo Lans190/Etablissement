@@ -354,7 +354,7 @@ export default function Settings() {
           </div>
 
           {/* Liste des Matières */}
-          <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
             <div className="p-6 border-b border-slate-50 bg-slate-50/30">
               <h3 className="font-bold text-slate-900">Matières Enseignées</h3>
             </div>
@@ -454,7 +454,7 @@ export default function Settings() {
           </div>
 
           {/* Liste des Attributions */}
-          <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
             <div className="p-6 border-b border-slate-50 bg-slate-50/30">
               <h3 className="font-bold text-slate-900">Cours Attribués par Classe</h3>
             </div>

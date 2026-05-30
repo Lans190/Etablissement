@@ -152,7 +152,7 @@ export default function AttendancePage() {
          </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden overflow-x-auto">
         <div className="p-4 bg-slate-50 border-b border-gray-100 flex justify-between items-center">
            <div className="flex items-center text-sm font-bold text-slate-700">
               <Users className="w-4 h-4 mr-2" />

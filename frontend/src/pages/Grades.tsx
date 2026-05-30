@@ -150,7 +150,7 @@ export default function Grades() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-900">Notes & Bulletins</h2>
         <div className="flex space-x-3">
            <Button onClick={() => setShowGenerateModal(true)} variant="outline" className="border-yellow-500 text-yellow-700 hover:bg-yellow-50">
@@ -197,7 +197,7 @@ export default function Grades() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+            <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h3 className="text-xl font-bold text-gray-900">Nouvelle Évaluation</h3>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="w-6 h-6" />
@@ -255,8 +255,8 @@ export default function Grades() {
 
       {showGradeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-slate-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden overflow-x-auto">
+            <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50">
               <h3 className="text-xl font-bold">{selectedAssessment?.title}</h3>
               <button onClick={() => setShowGradeModal(false)} className="bg-white p-2 rounded-full shadow-sm"><X className="w-5 h-5" /></button>
             </div>
@@ -296,7 +296,7 @@ export default function Grades() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white shadow-sm rounded-xl border border-gray-100 flex flex-col overflow-hidden">
+        <div className="bg-white shadow-sm rounded-xl border border-gray-100 flex flex-col overflow-hidden overflow-x-auto">
           <div className="p-6 border-b border-gray-100 bg-slate-50/50 flex justify-between items-center">
             <h3 className="text-lg font-bold text-gray-900 flex items-center">
               <FileText className="w-5 h-5 mr-2 text-blue-500" />
@@ -324,7 +324,7 @@ export default function Grades() {
           </div>
         </div>
 
-        <div className="bg-white shadow-sm rounded-xl border border-gray-100 flex flex-col overflow-hidden">
+        <div className="bg-white shadow-sm rounded-xl border border-gray-100 flex flex-col overflow-hidden overflow-x-auto">
           <div className="p-6 border-b border-gray-100 bg-slate-50/50 flex justify-between items-center">
             <h3 className="text-lg font-bold text-gray-900 flex items-center">
               <Award className="w-5 h-5 mr-2 text-yellow-500" />
@@ -337,7 +337,7 @@ export default function Grades() {
             ) : (
               <ul className="divide-y divide-gray-100">
                 {reportCards.map((rc: any) => (
-                  <li key={rc.id} className="p-4 hover:bg-slate-50 flex items-center justify-between">
+                  <li key={rc.id} className="p-4 hover:bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <h4 className="font-medium text-gray-900 text-sm">{rc.enrollment_name || "Élève"}</h4>
                       <p className="text-[10px] text-gray-500">{rc.term_name}</p>

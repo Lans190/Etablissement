@@ -103,7 +103,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Finance Comparison */}
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-           <div className="flex items-center justify-between mb-8">
+           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <h3 className="text-lg font-bold text-slate-900">Bilan Financier Global</h3>
               <div className="text-sm font-bold text-slate-500">Solde : <span className={stats.balance >= 0 ? 'text-green-600' : 'text-red-600'}>{stats.balance.toLocaleString()} FCFA</span></div>
            </div>
@@ -147,7 +147,7 @@ export default function Dashboard() {
            </div>
            <div className="space-y-3 mt-4">
               {cycles.map((c: any, index: number) => (
-                <div key={c.name} className="flex items-center justify-between text-xs">
+                <div key={c.name} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
                    <div className="flex items-center">
                       <div className="w-2 h-2 rounded-full mr-2" style={{backgroundColor: COLORS[index % COLORS.length]}}></div>
                       <span className="text-slate-600 font-medium">{c.name}</span>
@@ -164,7 +164,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Students by Class Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
              <div className="p-6 border-b border-slate-50">
                 <h3 className="text-lg font-bold text-slate-900">Répartition par Classe</h3>
              </div>

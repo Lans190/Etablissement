@@ -217,33 +217,34 @@ export default function Finance() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
            <h2 className="text-2xl font-bold text-gray-900">Gestion Financière</h2>
            <p className="text-sm text-gray-500">Suivi des flux financiers (Recettes scolaires, Recettes diverses et Dépenses).</p>
         </div>
-        <div className="flex space-x-3">
-           <div className="flex bg-slate-100 p-1 rounded-xl">
+        <div className="flex flex-col sm:flex-row gap-3">
+           <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto">
               <button 
                 onClick={() => setActiveTab('incomes')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'incomes' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'incomes' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
               >
                  Recettes
               </button>
               <button 
                 onClick={() => setActiveTab('expenses')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'expenses' ? 'bg-white shadow-sm text-red-600' : 'text-slate-500'}`}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'expenses' ? 'bg-white shadow-sm text-red-600' : 'text-slate-500'}`}
               >
                  Dépenses
               </button>
               <button 
                 onClick={() => setActiveTab('fee_types')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'fee_types' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500'}`}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'fee_types' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500'}`}
               >
                  Types de Frais
               </button>
            </div>
            
+           <div className="flex flex-wrap gap-2">
            {activeTab === 'incomes' && (
               <>
                  <Button variant="outline" className="border-blue-200 text-blue-600" onClick={() => setShowAllocModal(true)}>
@@ -270,12 +271,13 @@ export default function Finance() {
                  Nouveau Frais
               </Button>
            )}
+           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-           <div className="flex items-center justify-between mb-4">
+           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <div className="p-2 bg-green-50 text-green-600 rounded-lg"><ArrowUpRight /></div>
               <span className="text-[10px] font-bold text-slate-400 uppercase">Total Entrées (Recettes)</span>
            </div>
@@ -283,7 +285,7 @@ export default function Finance() {
            <p className="text-[10px] text-slate-400 mt-1">Scolaires: {schoolFeesIncomes.toLocaleString()} F | Diverses: {otherIncomesTotal.toLocaleString()} F</p>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-           <div className="flex items-center justify-between mb-4">
+           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <div className="p-2 bg-red-50 text-red-600 rounded-lg"><ArrowDownRight /></div>
               <span className="text-[10px] font-bold text-slate-400 uppercase">Total Sorties (Dépenses)</span>
            </div>
@@ -291,7 +293,7 @@ export default function Finance() {
            <p className="text-[10px] text-slate-400 mt-1">Tous types confondus</p>
         </div>
         <div className="bg-slate-900 p-6 rounded-2xl shadow-lg shadow-slate-200 text-white">
-           <div className="flex items-center justify-between mb-4">
+           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <div className="p-2 bg-white/10 text-white rounded-lg"><Wallet /></div>
               <span className="text-[10px] font-bold text-white/50 uppercase">Solde Net de Caisse</span>
            </div>
@@ -320,8 +322,8 @@ export default function Finance() {
 
             {incomeSubTab === 'school_fees' ? (
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                     <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
+                  <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
+                     <div className="p-6 border-b border-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/30">
                         <h3 className="font-bold text-slate-900">Élèves Redevables</h3>
                         <div className="flex items-center space-x-2">
                            <Search className="w-4 h-4 text-slate-400" />
@@ -384,7 +386,7 @@ export default function Finance() {
                      </div>
                      <div className="flex-1 overflow-auto max-h-[500px] divide-y divide-slate-50">
                         {payments.map((p: any) => (
-                           <div key={p.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                           <div key={p.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
                               <div>
                                  <p className="text-sm font-bold text-slate-950">{parseFloat(p.amount_paid).toLocaleString()} F</p>
                                  <p className="text-[10px] text-slate-400 flex items-center mt-0.5">
@@ -402,7 +404,7 @@ export default function Finance() {
                </div>
             ) : (
                /* Recettes Diverses (Comme les Dépenses !) */
-               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
                   <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center">
                      <h3 className="font-bold text-slate-900">Registre des Recettes Diverses</h3>
                      <span className="text-xs text-slate-400 font-bold">Total saisi : {otherIncomesTotal.toLocaleString()} F</span>
@@ -449,7 +451,7 @@ export default function Finance() {
       )}
 
       {activeTab === 'expenses' && (
-         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
             <div className="p-6 border-b border-slate-50 bg-slate-50/30">
                <h3 className="font-bold text-slate-900">Journal des Dépenses (Sorties)</h3>
             </div>
@@ -493,7 +495,7 @@ export default function Finance() {
       )}
 
       {activeTab === 'fee_types' && (
-         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
             <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center">
                <h3 className="font-bold text-slate-900">Types de Frais Scolaires</h3>
             </div>
@@ -542,7 +544,7 @@ export default function Finance() {
       {/* Modal Details / Payment History */}
       {showDetailsModal && selectedAlloc && (
          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl animate-in zoom-in duration-200 overflow-hidden">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl animate-in zoom-in duration-200 overflow-hidden overflow-x-auto">
                <div className="p-6 border-b bg-slate-50 flex justify-between items-center">
                   <div>
                      <h3 className="text-xl font-black text-slate-900">Détails des Paiements</h3>
@@ -552,7 +554,7 @@ export default function Finance() {
                </div>
                
                <div className="p-6 space-y-6">
-                  <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-2xl text-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-2xl text-center">
                      <div>
                         <span className="text-[10px] font-bold text-slate-400 uppercase">Montant Total</span>
                         <p className="text-lg font-black text-slate-800">{parseFloat(selectedAlloc.amount).toLocaleString()} F</p>
@@ -616,7 +618,7 @@ export default function Finance() {
       {/* Modal Nouveau Type de Frais */}
       {showTypeModal && (
          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden overflow-x-auto">
                <div className="p-6 border-b bg-slate-50 flex justify-between items-center">
                   <h3 className="text-xl font-bold text-slate-900">Créer un Type de Frais</h3>
                   <button onClick={() => setShowTypeModal(false)}><X /></button>
@@ -648,7 +650,7 @@ export default function Finance() {
       {/* Modal Assign Fees */}
       {showAllocModal && (
          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden overflow-x-auto">
                <div className="p-6 border-b bg-blue-50 flex justify-between items-center">
                   <h3 className="text-xl font-bold text-blue-900">Assigner des Frais</h3>
                   <button onClick={() => setShowAllocModal(false)}><X /></button>
@@ -690,7 +692,7 @@ export default function Finance() {
       {/* Modal Expense (Sortie) */}
       {showExpenseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
+           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden overflow-x-auto">
               <div className="p-6 border-b bg-red-50 flex justify-between items-center">
                  <h3 className="text-xl font-bold text-red-900">Enregistrer une Sortie (Dépense)</h3>
                  <button onClick={() => setShowExpenseModal(false)}><X /></button>
@@ -725,7 +727,7 @@ export default function Finance() {
       {/* Modal Income (Recette Diverses) */}
       {showIncomeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
+           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden overflow-x-auto">
               <div className="p-6 border-b bg-green-50 flex justify-between items-center">
                  <h3 className="text-xl font-bold text-green-900 font-black">Enregistrer une Entrée (Recette)</h3>
                  <button onClick={() => setShowIncomeModal(false)}><X /></button>
@@ -760,7 +762,7 @@ export default function Finance() {
       {/* Modal Payment (Encaissement Frais Élèves) */}
       {showPaymentModal && selectedAlloc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
+           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden overflow-x-auto">
               <div className="p-6 border-b bg-green-50 flex justify-between items-center">
                  <h3 className="text-xl font-bold text-green-900">Encaisser Frais</h3>
                  <button onClick={() => setShowPaymentModal(false)}><X /></button>

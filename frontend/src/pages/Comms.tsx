@@ -84,7 +84,7 @@ export default function Comms() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-900">Centre de Communication SMS</h2>
         <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg flex items-center text-sm font-medium border border-blue-100">
           <Clock className="w-4 h-4 mr-2" />
@@ -173,7 +173,7 @@ export default function Comms() {
         {/* Historique */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+            <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h3 className="text-lg font-bold text-gray-900 flex items-center">
                 <History className="w-5 h-5 mr-2 text-slate-400" />
                 Historique des envois

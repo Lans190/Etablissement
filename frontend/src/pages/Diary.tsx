@@ -70,7 +70,7 @@ export default function Diary() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-900">Cahier de Texte</h2>
         {canEdit && (
           <Button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700">
@@ -84,7 +84,7 @@ export default function Diary() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+            <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h3 className="text-xl font-bold text-gray-900">Saisir une leçon</h3>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="w-6 h-6" />
@@ -190,8 +190,8 @@ export default function Diary() {
       ) : (
         <div className="space-y-4">
           {entries.map((entry: any) => (
-            <div key={entry.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="bg-slate-50 border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+            <div key={entry.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden overflow-x-auto">
+              <div className="bg-slate-50 border-b border-gray-100 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full text-sm">
                     <BookOpen className="w-4 h-4 mr-2" />
@@ -217,7 +217,7 @@ export default function Diary() {
                   </div>
                 )}
                 
-                <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <span className="text-sm text-gray-500">
                     Dispensé par : {entry.teacher_name}
                   </span>

@@ -159,7 +159,7 @@ export default function Users() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Gestion des Comptes & Liaison Parents</h2>
           <p className="text-sm text-gray-500 mt-1">Créez des accès, associez les parents aux élèves, et stockez les pièces d'identité.</p>
@@ -174,7 +174,7 @@ export default function Users() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg my-8 overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-slate-50">
+            <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50">
               <div>
                  <h3 className="text-xl font-black text-gray-900">{editingUser ? "Éditer l'utilisateur" : "Ajouter un utilisateur"}</h3>
                  <p className="text-xs text-gray-500 mt-1">Veuillez renseigner toutes les informations requises.</p>
@@ -344,7 +344,7 @@ export default function Users() {
         </div>
       )}
 
-      <div className="bg-white shadow-sm rounded-3xl border border-slate-100 overflow-hidden">
+      <div className="bg-white shadow-sm rounded-3xl border border-slate-100 overflow-hidden overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 text-left">
           <thead className="bg-slate-50">
             <tr>

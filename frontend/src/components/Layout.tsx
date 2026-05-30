@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, LogOut, UserCog, MessageSquare, Wallet, Award, UserCheck, Clock, FolderOpen, FileText, Calendar, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Users, LogOut, UserCog, MessageSquare, Wallet, Award, UserCheck, Clock, FolderOpen, FileText, Calendar, BookOpen, Menu, X } from 'lucide-react';
 
 import api from '@/api/axios';
 
@@ -15,6 +15,11 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -45,9 +50,26 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      <div className="w-64 bg-slate-900 text-white shadow-xl flex flex-col">
-        <div className="h-16 flex items-center justify-center font-bold text-xl border-b border-slate-800">
-          <span className="text-blue-500 mr-2">Sene</span>School
+      {/* Overlay pour mobile */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white shadow-xl flex flex-col transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="h-16 flex items-center justify-between px-4 font-bold text-xl border-b border-slate-800">
+          <div className="flex items-center justify-center flex-1">
+            <span className="text-blue-500 mr-2">Sene</span>School
+          </div>
+          <button 
+            className="md:hidden text-slate-400 hover:text-white"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           
@@ -137,13 +159,19 @@ export default function Layout() {
           </button>
         </div>
       </div>
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white shadow-sm flex items-center justify-between px-8">
+      <div className="flex-1 flex flex-col overflow-hidden w-full">
+        <header className="h-16 bg-white shadow-sm flex items-center px-4 md:px-8">
+           <button 
+             className="md:hidden mr-4 p-2 -ml-2 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+             onClick={() => setIsMobileMenuOpen(true)}
+           >
+             <Menu className="w-6 h-6" />
+           </button>
            <div className="flex items-center">
-              <span className="text-slate-400 text-sm">{location.pathname.substring(1).toUpperCase()}</span>
+              <span className="text-slate-400 text-sm font-medium">{location.pathname.substring(1).toUpperCase()}</span>
            </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-8 bg-slate-50">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
           <Outlet />
         </main>
       </div>

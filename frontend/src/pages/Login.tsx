@@ -47,8 +47,8 @@ export default function Login() {
   };
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-10 shadow-lg">
+    <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-4">
+      <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-6 sm:p-10 shadow-lg">
         <div className="text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
             <GraduationCap className="h-8 w-8 text-blue-600" />
