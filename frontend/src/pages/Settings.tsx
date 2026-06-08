@@ -97,7 +97,7 @@ export default function Settings() {
         api.get('core/classrooms/'),
         api.get('auth/users/'),
         api.get('core/cycles/'),
-        api.get('academics/timeslots/'),
+        api.get('academics/timeslots/').catch(() => ({ data: [] })),
       ]);
 
       if (schoolRes.data.length > 0) {
@@ -541,6 +541,78 @@ export default function Settings() {
                         <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => handleDeleteClass(cls.id)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Onglet Créneaux Horaires ─────────────────────────────────────────────── */}
+      {activeSubTab === 'timeslots' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4 h-fit">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center">
+              <Plus className="w-5 h-5 mr-2 text-blue-600" />
+              Nouveau Créneau
+            </h3>
+            <form onSubmit={handleAddTimeslot} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Heure de début</label>
+                <input
+                  required type="time"
+                  className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 font-bold"
+                  value={newTimeslot.start_time}
+                  onChange={e => setNewTimeslot({ ...newTimeslot, start_time: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Heure de fin</label>
+                <input
+                  required type="time"
+                  className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 font-bold"
+                  value={newTimeslot.end_time}
+                  onChange={e => setNewTimeslot({ ...newTimeslot, end_time: e.target.value })}
+                />
+              </div>
+              <Button type="submit" disabled={saving} className="w-full bg-blue-600 hover:bg-blue-700 h-12 rounded-xl font-bold">
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Ajouter le créneau'}
+              </Button>
+            </form>
+          </div>
+
+          <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="p-6 border-b border-slate-50 bg-slate-50/30">
+              <h3 className="font-bold text-slate-900">Créneaux Horaires Enregistrés</h3>
+            </div>
+            <div className="overflow-x-auto max-h-[500px]">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 sticky top-0">
+                  <tr>
+                    <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase">Heure de Début</th>
+                    <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase">Heure de Fin</th>
+                    <th className="px-6 py-3 text-right text-[10px] font-bold text-slate-400 uppercase">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {timeslots.length === 0 ? (
+                    <tr><td colSpan={3} className="p-10 text-center text-gray-400 italic">Aucun créneau horaire enregistré.</td></tr>
+                  ) : (
+                    (timeslots as any[]).map((ts: any) => (
+                      <tr key={ts.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4 font-bold text-sm text-slate-900">{ts.start_time.substring(0, 5)}</td>
+                        <td className="px-6 py-4 font-bold text-sm text-slate-900">{ts.end_time.substring(0, 5)}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => handleDeleteTimeslot(ts.id)}
                             className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
