@@ -19,8 +19,10 @@ class AcademicYearSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ClassRoomSerializer(serializers.ModelSerializer):
-    cycle_name = serializers.ReadOnlyField(source='cycle.get_name_display')
-    
+    cycle_name  = serializers.ReadOnlyField(source='cycle.get_name_display')
+    level_display  = serializers.ReadOnlyField(source='get_level_display')
+    series_display = serializers.ReadOnlyField(source='get_series_display')
+
     class Meta:
         model = ClassRoom
         fields = '__all__'

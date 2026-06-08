@@ -49,13 +49,65 @@ class Cycle(models.Model):
 
 
 class ClassRoom(models.Model):
-    name = models.CharField(max_length=50, verbose_name=_("Nom de la classe (ex: 6ème A)"))
-    cycle = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name='classes', verbose_name=_("Cycle"))
+    """Classe scolaire avec niveau et série pour le système éducatif sénégalais"""
+
+    class LevelChoices(models.TextChoices):
+        # Primaire (Élémentaire)
+        CI   = 'CI',   _('CI (Cours Initiation)')
+        CP   = 'CP',   _('CP (Cours Préparatoire)')
+        CE1  = 'CE1',  _('CE1 (Cours Élémentaire 1)')
+        CE2  = 'CE2',  _('CE2 (Cours Élémentaire 2)')
+        CM1  = 'CM1',  _('CM1 (Cours Moyen 1)')
+        CM2  = 'CM2',  _('CM2 (Cours Moyen 2)')
+        # Collège (Moyen)
+        SIXIEME   = '6EME',  _('6ème')
+        CINQUIEME = '5EME',  _('5ème')
+        QUATRIEME = '4EME',  _('4ème')
+        TROISIEME = '3EME',  _('3ème')
+        # Lycée (Secondaire)
+        SECONDE    = 'SECONDE',    _('Seconde')
+        PREMIERE   = 'PREMIERE',   _('1ère')
+        TERMINALE  = 'TERMINALE',  _('Terminale')
+
+    class SeriesChoices(models.TextChoices):
+        # Séries scientifiques
+        S1   = 'S1',   _('S1 (Maths-Sciences Physiques)')
+        S2   = 'S2',   _('S2 (Sciences Naturelles)')
+        S3   = 'S3',   _('S3 (Sciences et Technologies)')
+        # Séries littéraires / sociales
+        L1   = 'L1',   _('L1 (Lettres & Sciences Humaines)')
+        L2   = 'L2',   _('L2 (Arabe & Sciences Humaines)')
+        # Séries techniques
+        S4   = 'S4',   _('S4 (Sciences et Technologies Industrielles)')
+        STEG = 'STEG', _('STEG (Sciences et Technologies Éco. & Gestion)')
+        G    = 'G',    _('G (Gestion)')
+        # Pas de série (Primaire / Collège)
+        AUCUNE = 'AUCUNE', _('Aucune (Primaire / Collège)')
+
+    name   = models.CharField(max_length=50, verbose_name=_("Nom de la classe (ex: 6ème A)"))
+    cycle  = models.ForeignKey(Cycle, on_delete=models.CASCADE, related_name='classes', verbose_name=_("Cycle"))
+    level  = models.CharField(
+        max_length=10,
+        choices=LevelChoices.choices,
+        blank=True, null=True,
+        verbose_name=_("Niveau")
+    )
+    series = models.CharField(
+        max_length=10,
+        choices=SeriesChoices.choices,
+        default=SeriesChoices.AUCUNE,
+        verbose_name=_("Série (Lycée)")
+    )
     capacity = models.PositiveIntegerField(default=30, verbose_name=_("Capacité maximale"))
 
     def __str__(self):
-        return f"{self.name} ({self.cycle.get_name_display()})"
-    
+        label = self.name
+        if self.level:
+            label += f" – {self.get_level_display()}"
+        if self.series and self.series != 'AUCUNE':
+            label += f" [{self.series}]"
+        return f"{label} ({self.cycle.get_name_display()})"
+
     class Meta:
         verbose_name = _("Classe")
         verbose_name_plural = _("Classes")

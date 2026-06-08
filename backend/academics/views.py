@@ -14,6 +14,15 @@ class IsAdminOrDirection(permissions.BasePermission):
             return True
         return request.user.is_authenticated and request.user.role in ['ADMIN', 'DIRECTION']
 
+class IsAdminOnly(permissions.BasePermission):
+    """Seul l'ADMIN peut créer, modifier ou supprimer. Lecture ouverte à tous les authentifiés."""
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return request.user.role == 'ADMIN'
+
 class SubjectViewSet(viewsets.ModelViewSet):
     queryset = Subject.objects.all()
     serializer_class = SubjectSerializer
@@ -69,8 +78,9 @@ class TimeSlotViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrDirection]
 
 class TimetableEntryViewSet(viewsets.ModelViewSet):
+    """L'emploi du temps : lecture pour tous, écriture réservée à l'ADMIN uniquement."""
     serializer_class = TimetableEntrySerializer
-    permission_classes = [IsAdminOrDirection]
+    permission_classes = [IsAdminOnly]
 
     def get_queryset(self):
         queryset = TimetableEntry.objects.all()
@@ -101,12 +111,12 @@ class TeachingPointageViewSet(viewsets.ModelViewSet):
         serializer.save(teacher=self.request.user, is_validated=is_val)
 
     def partial_update(self, request, *args, **kwargs):
-        # Seuls les admin/direction peuvent valider
+        # Seul l'ADMIN peut valider le pointage
         if 'is_validated' in request.data:
-            if request.user.role not in ['ADMIN', 'DIRECTION']:
+            if request.user.role != 'ADMIN':
                 from rest_framework.response import Response
                 from rest_framework import status
-                return Response({'detail': 'Seul un directeur peut valider.'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'detail': 'Seul l\u2019administrateur peut valider le pointage.'}, status=status.HTTP_403_FORBIDDEN)
         kwargs['partial'] = True
         return self.update(request, *args, **kwargs)
 

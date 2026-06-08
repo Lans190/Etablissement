@@ -11,7 +11,9 @@ export default function Pointage() {
   const [showModal, setShowModal] = useState(false);
   
   const [userProfile] = useState(() => JSON.parse(localStorage.getItem('user_profile') || '{}'));
-  const isAdmin = ['ADMIN', 'DIRECTION'].includes(userProfile?.role);
+  // Seul l'ADMIN peut valider un pointage
+  const isAdmin = userProfile?.role === 'ADMIN';
+  const isTeacher = userProfile?.role === 'ENSEIGNANT';
 
   const [formData, setFormData] = useState({
     classroom: '',
@@ -69,7 +71,8 @@ export default function Pointage() {
           <h2 className="text-2xl font-bold text-gray-900">Pointage des Heures</h2>
           <p className="text-sm text-gray-500">Suivi des heures de cours effectuées par les enseignants.</p>
         </div>
-        {!isAdmin && (
+        {/* Seuls les enseignants peuvent enregistrer une séance */}
+        {isTeacher && (
           <Button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="w-4 h-4 mr-2" />
             Enregistrer ma séance
@@ -105,19 +108,18 @@ export default function Pointage() {
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                       <CheckCircle className="w-3 h-3 mr-1" /> Validé
                     </span>
+                  ) : isAdmin ? (
+                    <button
+                      onClick={() => validatePointage(p.id)}
+                      className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full font-bold hover:bg-blue-100 transition-colors"
+                      title="Valider ce pointage (Admin uniquement)"
+                    >
+                      ✔ Valider
+                    </button>
                   ) : (
-                    isAdmin ? (
-                      <button 
-                        onClick={() => validatePointage(p.id)}
-                        className="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-bold hover:bg-blue-100 transition-colors"
-                      >
-                        Valider
-                      </button>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                        En attente
-                      </span>
-                    )
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                      En attente de validation
+                    </span>
                   )}
                 </td>
               </tr>

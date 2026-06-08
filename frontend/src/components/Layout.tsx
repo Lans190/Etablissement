@@ -43,10 +43,23 @@ export default function Layout() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const canSeeDashboard = userProfile?.role === 'ADMIN' || userProfile?.role === 'DIRECTION';
-  const canSeeGrades = ['ADMIN', 'DIRECTION', 'ENSEIGNANT', 'ELEVE', 'PARENT'].includes(userProfile?.role || '');
-  const canSeeFinance = ['ADMIN', 'DIRECTION', 'COMPTABLE', 'PARENT'].includes(userProfile?.role || '');
-  const isStaff = ['ADMIN', 'DIRECTION'].includes(userProfile?.role || '');
+  // ── Règles de visibilité par rôle ──────────────────────────────────────
+  const role = userProfile?.role || '';
+
+  // Tableau de bord : ADMIN et DIRECTION uniquement
+  const canSeeDashboard = ['ADMIN', 'DIRECTION'].includes(role);
+
+  // Notes & bulletins : tout le monde sauf COMPTABLE
+  const canSeeGrades = ['ADMIN', 'DIRECTION', 'ENSEIGNANT', 'ELEVE', 'PARENT'].includes(role);
+
+  // Finance : ADMIN, DIRECTION et COMPTABLE uniquement (PAS enseignant/parent/élève)
+  const canSeeFinance = ['ADMIN', 'DIRECTION', 'COMPTABLE'].includes(role);
+
+  // Administration (gestion utilisateurs, élèves, SMS, paramètres)
+  const isStaff = ['ADMIN', 'DIRECTION'].includes(role);
+
+  // Pointage : ADMIN et ENSEIGNANT uniquement
+  const canSeePointage = ['ADMIN', 'DIRECTION', 'ENSEIGNANT'].includes(role);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -95,10 +108,10 @@ export default function Layout() {
             {userProfile?.role === 'ELEVE' ? 'Mon Cahier de Texte' : 'Cahier de Texte'}
           </Link>
 
-          {['ADMIN', 'DIRECTION', 'ENSEIGNANT'].includes(userProfile?.role || '') && (
+          {canSeePointage && (
             <Link to="/pointage" className={`flex items-center px-4 py-3 rounded-lg transition-colors ${isActive('/pointage') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
               <Clock className="w-5 h-5 mr-3" />
-              {userProfile?.role === 'ENSEIGNANT' ? 'Mon Pointage' : 'Pointage Heures'}
+              {role === 'ENSEIGNANT' ? 'Mon Pointage' : 'Pointage Heures'}
             </Link>
           )}
           
@@ -117,7 +130,7 @@ export default function Layout() {
           {canSeeFinance && (
             <Link to="/finance" className={`flex items-center px-4 py-3 rounded-lg transition-colors ${isActive('/finance') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
               <Wallet className="w-5 h-5 mr-3" />
-              {userProfile?.role === 'PARENT' ? 'Paiements Scolarité' : 'Finance & Scolarité'}
+              Finance &amp; Scolarité
             </Link>
           )}
 
@@ -149,9 +162,9 @@ export default function Layout() {
         </nav>
         <div className="p-4 border-t border-slate-800">
           <div className="mb-4 px-2">
-            <p className="text-xs text-slate-400">Connecté en tant que:</p>
+            <p className="text-xs text-slate-400">Connecté en tant que :</p>
             <p className="text-sm font-semibold truncate">{userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Chargement...'}</p>
-            <p className="text-xs text-blue-400">{userProfile?.role}</p>
+            <p className="text-xs text-blue-400 capitalize">{role}</p>
           </div>
           <button onClick={handleLogout} className="flex items-center w-full px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
             <LogOut className="w-4 h-4 mr-2" />
