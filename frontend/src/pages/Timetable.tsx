@@ -17,8 +17,8 @@ type TimetableEntry = { id: number; day: string; timeslot: number; subject_name:
 export default function Timetable() {
   const [userProfile] = useState(() => JSON.parse(localStorage.getItem('user_profile') || '{}'));
 
-  // Seul l'ADMIN peut modifier l'emploi du temps
-  const isAdmin = userProfile?.role === 'ADMIN';
+  // ADMIN et DIRECTION ont les mêmes droits sur l'emploi du temps
+  const isAdmin = ['ADMIN', 'DIRECTION'].includes(userProfile?.role);
 
   const [timeslots, setTimeslots]   = useState<Timeslot[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);

@@ -11,8 +11,8 @@ export default function Pointage() {
   const [showModal, setShowModal] = useState(false);
   
   const [userProfile] = useState(() => JSON.parse(localStorage.getItem('user_profile') || '{}'));
-  // Seul l'ADMIN peut valider un pointage
-  const isAdmin = userProfile?.role === 'ADMIN';
+  // ADMIN et DIRECTION ont les mêmes droits (validation du pointage)
+  const isAdmin = ['ADMIN', 'DIRECTION'].includes(userProfile?.role);
   const isTeacher = userProfile?.role === 'ENSEIGNANT';
 
   const [formData, setFormData] = useState({
