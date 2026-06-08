@@ -4,7 +4,7 @@ import { Settings as SettingsIcon, Save, Camera, Loader2, MapPin, Phone, Mail, B
 import { Button } from '@/components/ui/button';
 
 export default function Settings() {
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'classes' | 'subjects' | 'allocations'>('profile');
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'classes' | 'subjects' | 'allocations' | 'timeslots'>('profile');
   const [school, setSchool] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -16,6 +16,7 @@ export default function Settings() {
   const [classrooms, setClassrooms] = useState([]);
   const [teachers, setTeachers]     = useState([]);
   const [cycles, setCycles]         = useState([]);
+  const [timeslots, setTimeslots]   = useState([]);
 
   // Form states
   const [schoolData, setSchoolData] = useState({
@@ -30,6 +31,10 @@ export default function Settings() {
 
   const [newAlloc, setNewAlloc] = useState({
     subject: '', classroom: '', teacher: '', coefficient: '1'
+  });
+
+  const [newTimeslot, setNewTimeslot] = useState({
+    start_time: '08:00', end_time: '09:00'
   });
 
   // ── Gestion des Classes ────────────────────────────────────────────────
@@ -85,13 +90,14 @@ export default function Settings() {
 
   const fetchData = async () => {
     try {
-      const [schoolRes, subjRes, allocRes, classRes, usersRes, cycleRes] = await Promise.all([
+      const [schoolRes, subjRes, allocRes, classRes, usersRes, cycleRes, tsRes] = await Promise.all([
         api.get('core/schools/'),
         api.get('academics/subjects/'),
         api.get('academics/allocations/'),
         api.get('core/classrooms/'),
         api.get('auth/users/'),
         api.get('core/cycles/'),
+        api.get('academics/timeslots/'),
       ]);
 
       if (schoolRes.data.length > 0) {
@@ -105,6 +111,7 @@ export default function Settings() {
       setAllocations(allocRes.data);
       setClassrooms(classRes.data);
       setCycles(cycleRes.data);
+      setTimeslots(tsRes.data);
       setTeachers(usersRes.data.filter((u: any) => u.role === 'ENSEIGNANT'));
 
       if (subjRes.data.length > 0) setNewAlloc(prev => ({ ...prev, subject: subjRes.data[0].id.toString() }));
@@ -252,6 +259,31 @@ export default function Settings() {
     }
   };
 
+  // ── Gestion des Créneaux (TimeSlots) ───────────────────────────────────
+  const handleAddTimeslot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.post('academics/timeslots/', newTimeslot);
+      fetchData();
+      alert('Créneau horaire ajouté avec succès !');
+    } catch {
+      alert('Erreur lors de l\'ajout du créneau. Vérifiez qu\'il n\'existe pas déjà.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteTimeslot = async (id: number) => {
+    if (!confirm('Voulez-vous vraiment supprimer ce créneau horaire ? Cela affectera l\'emploi du temps.')) return;
+    try {
+      await api.delete(`academics/timeslots/${id}/`);
+      fetchData();
+    } catch {
+      alert('Erreur lors de la suppression.');
+    }
+  };
+
   if (loading) return <div className="p-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600" /></div>;
 
   return (
@@ -271,6 +303,7 @@ export default function Settings() {
         {([
           { key: 'profile',     label: 'Identité de l\'École' },
           { key: 'classes',     label: 'Classes' },
+          { key: 'timeslots',   label: 'Créneaux Horaires' },
           { key: 'subjects',    label: 'Matières' },
           { key: 'allocations', label: 'Attribution des Cours' },
         ] as const).map(tab => (
@@ -508,6 +541,78 @@ export default function Settings() {
                         <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => handleDeleteClass(cls.id)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Onglet Créneaux Horaires ─────────────────────────────────────────────── */}
+      {activeSubTab === 'timeslots' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4 h-fit">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center">
+              <Plus className="w-5 h-5 mr-2 text-blue-600" />
+              Nouveau Créneau
+            </h3>
+            <form onSubmit={handleAddTimeslot} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Heure de début</label>
+                <input
+                  required type="time"
+                  className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 font-bold"
+                  value={newTimeslot.start_time}
+                  onChange={e => setNewTimeslot({ ...newTimeslot, start_time: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Heure de fin</label>
+                <input
+                  required type="time"
+                  className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 font-bold"
+                  value={newTimeslot.end_time}
+                  onChange={e => setNewTimeslot({ ...newTimeslot, end_time: e.target.value })}
+                />
+              </div>
+              <Button type="submit" disabled={saving} className="w-full bg-blue-600 hover:bg-blue-700 h-12 rounded-xl font-bold">
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Ajouter le créneau'}
+              </Button>
+            </form>
+          </div>
+
+          <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="p-6 border-b border-slate-50 bg-slate-50/30">
+              <h3 className="font-bold text-slate-900">Créneaux Horaires Enregistrés</h3>
+            </div>
+            <div className="overflow-x-auto max-h-[500px]">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 sticky top-0">
+                  <tr>
+                    <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase">Heure de Début</th>
+                    <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase">Heure de Fin</th>
+                    <th className="px-6 py-3 text-right text-[10px] font-bold text-slate-400 uppercase">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {timeslots.length === 0 ? (
+                    <tr><td colSpan={3} className="p-10 text-center text-gray-400 italic">Aucun créneau horaire enregistré.</td></tr>
+                  ) : (
+                    (timeslots as any[]).map((ts: any) => (
+                      <tr key={ts.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4 font-bold text-sm text-slate-900">{ts.start_time.substring(0, 5)}</td>
+                        <td className="px-6 py-4 font-bold text-sm text-slate-900">{ts.end_time.substring(0, 5)}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => handleDeleteTimeslot(ts.id)}
                             className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
