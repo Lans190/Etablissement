@@ -32,15 +32,30 @@ class FeeAllocationViewSet(viewsets.ModelViewSet):
         classroom_id = request.data.get('classroom_id')
         fee_type_id = request.data.get('fee_type_id')
         due_date = request.data.get('due_date')
+
+        # Convert to int if provided as string (from HTML select)
+        try:
+            classroom_id = int(classroom_id) if classroom_id else None
+            fee_type_id = int(fee_type_id) if fee_type_id else None
+        except (ValueError, TypeError):
+            classroom_id = None
+            fee_type_id = None
         
         if not all([classroom_id, fee_type_id, due_date]):
-            return Response({"error": "Données manquantes"}, status=400)
+            return Response({"error": "Données manquantes (classe, type de frais et date d'échéance obligatoires)"}, status=400)
             
         from students.models import Enrollment
         from .models import FeeType
         
-        fee_type = FeeType.objects.get(id=fee_type_id)
+        try:
+            fee_type = FeeType.objects.get(id=fee_type_id, school=request.user.school)
+        except FeeType.DoesNotExist:
+            return Response({"error": "Type de frais introuvable"}, status=404)
+
         enrollments = Enrollment.objects.filter(classroom_id=classroom_id, is_active=True)
+
+        if not enrollments.exists():
+            return Response({"error": "Aucun élève inscrit actif dans cette classe"}, status=400)
         
         allocations = []
         for enroll in enrollments:
@@ -55,7 +70,7 @@ class FeeAllocationViewSet(viewsets.ModelViewSet):
             if created:
                 allocations.append(alloc)
                 
-        return Response({"message": f"{len(allocations)} frais assignés avec succès."}, status=201)
+        return Response({"message": f"{len(allocations)} frais assignés avec succès. ({enrollments.count() - len(allocations)} déjà existants)"}, status=201)
 
 from .utils import generate_payment_receipt_pdf
 from django.http import HttpResponse

@@ -5,6 +5,7 @@ class FeeTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeeType
         fields = '__all__'
+        read_only_fields = ('school',)
 
 class PaymentSerializer(serializers.ModelSerializer):
     recorded_by_name = serializers.ReadOnlyField(source='recorded_by.get_full_name')

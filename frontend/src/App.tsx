@@ -1,4 +1,4 @@
-import React from 'react'; // Main App Component
+import React, { useEffect } from 'react'; // Main App Component
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -38,6 +38,17 @@ const RoleRoute = ({
 };
 
 function App() {
+  // Keep-alive : ping le backend Render toutes les 14 min pour éviter le "sleep"
+  useEffect(() => {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/';
+    const keepAlive = () => {
+      fetch(`${API_URL}ping/`).catch(() => {});
+    };
+    keepAlive(); // Ping immédiatement au chargement
+    const interval = setInterval(keepAlive, 14 * 60 * 1000); // Toutes les 14 minutes
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <Router>
       <Routes>

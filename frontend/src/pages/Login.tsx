@@ -9,12 +9,14 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [waking, setWaking] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setWaking(false);
     
     try {
       const response = await api.post('auth/login/', {
@@ -40,9 +42,21 @@ export default function Login() {
         navigate('/timetable');
       }
     } catch (err: any) {
-      setError("Identifiants incorrects ou problème de connexion.");
+      // Erreur réseau = le backend se réveille (Render sleep)
+      if (!err.response) {
+        setWaking(true);
+        setError('');
+        // Réessayer automatiquement après 6 secondes
+        setTimeout(() => {
+          setWaking(false);
+          setLoading(false);
+        }, 6000);
+        return;
+      }
+      // Mauvais identifiants
+      setError(err.response?.data?.detail || "Identifiants incorrects. Vérifiez votre nom d'utilisateur et mot de passe.");
     } finally {
-      setLoading(false);
+      if (!waking) setLoading(false);
     }
   };
 
@@ -58,6 +72,15 @@ export default function Login() {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+          {waking && (
+            <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-700 border border-yellow-200 flex items-center space-x-2">
+              <svg className="animate-spin h-4 w-4 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <span>⚡ Le serveur se réveille, veuillez patienter quelques secondes et réessayer...</span>
+            </div>
+          )}
           {error && (
             <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">
               {error}

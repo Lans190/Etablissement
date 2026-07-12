@@ -33,12 +33,11 @@ class EmailOrUsernameTokenSerializer(TokenObtainPairSerializer):
 
         # Tentative 2 : connexion par email (si username non trouvé)
         if user is None:
-            try:
-                candidate = User.objects.get(email=login_input)
-                if candidate.check_password(password) and candidate.is_active:
-                    user = candidate
-            except User.DoesNotExist:
-                pass
+            # Utiliser filter().first() pour éviter MultipleObjectsReturned
+            # quand plusieurs comptes partagent le même email
+            candidate = User.objects.filter(email=login_input).first()
+            if candidate and candidate.check_password(password) and candidate.is_active:
+                user = candidate
 
         if user is None:
             raise AuthenticationFailed(
