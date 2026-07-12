@@ -18,6 +18,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [waking, setWaking] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,15 +29,26 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setWaking(false);
     
     try {
       await api.post('auth/register/', formData);
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
     } catch (err: any) {
+      // Erreur réseau = le backend Render se réveille
+      if (!err.response) {
+        setWaking(true);
+        setError('');
+        setTimeout(() => {
+          setWaking(false);
+          setLoading(false);
+        }, 6000);
+        return;
+      }
       setError(err.response?.data?.error || "Une erreur est survenue lors de l'inscription.");
     } finally {
-      setLoading(false);
+      if (!waking) setLoading(false);
     }
   };
 
@@ -65,7 +77,16 @@ export default function Register() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl">
         <div className="bg-white py-8 px-4 shadow sm:rounded-xl sm:px-10 border border-gray-100">
           <form className="space-y-8" onSubmit={handleSubmit}>
-            {error && (
+            {waking && (
+              <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-700 border border-yellow-200 flex items-center space-x-2">
+                <svg className="animate-spin h-4 w-4 text-yellow-600 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <span>⚡ Le serveur se réveille, veuillez patienter quelques secondes et réessayer...</span>
+              </div>
+            )}
+          {error && (
               <div className="rounded-md bg-red-50 p-4 text-sm text-red-600 border border-red-100">
                 {error}
               </div>
