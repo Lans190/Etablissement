@@ -109,12 +109,12 @@ class CurrentUserView(APIView):
 class RegisterSchoolView(APIView):
     permission_classes = [permissions.AllowAny]
 
-    @transaction.atomic
     def post(self, request):
         data = request.data
         try:
-            # 1. Créer l'école
-            school = School.objects.create(
+            with transaction.atomic():
+                # 1. Créer l'école
+                school = School.objects.create(
                 name=data.get('school_name'),
                 address=data.get('school_address', ''),
                 phone_number=data.get('school_phone', '')
@@ -133,5 +133,5 @@ class RegisterSchoolView(APIView):
             
             return Response({"message": "École et compte administrateur créés avec succès."}, status=status.HTTP_201_CREATED)
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": f"Erreur de création : {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
