@@ -2,6 +2,7 @@ from rest_framework import viewsets, permissions, status
 import random
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db.models import Count, Q, Sum
 from .models import Enrollment, Attendance
 from .serializers import EnrollmentSerializer, AttendanceSerializer
 
@@ -12,12 +13,14 @@ class IsAdminOrTeacher(permissions.BasePermission):
         return request.user.is_authenticated and request.user.role in ['ADMIN', 'DIRECTION', 'ENSEIGNANT']
 
 class EnrollmentViewSet(viewsets.ModelViewSet):
-    queryset = Enrollment.objects.all()
     serializer_class = EnrollmentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
+        if not user.is_authenticated:
+            return Enrollment.objects.none()
+            
         queryset = Enrollment.objects.all()
         
         classroom_id = self.request.query_params.get('classroom')
@@ -26,7 +29,10 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
 
         if user.role == 'ELEVE':
             return queryset.filter(student=user)
-        # TODO: Add logic for PARENT role
+        elif user.role == 'PARENT':
+            return queryset.filter(student__parents=user)
+        elif user.school:
+            return queryset.filter(classroom__cycle__school=user.school)
         return queryset
 
     @action(detail=True, methods=['get'])
@@ -98,44 +104,168 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class AttendanceViewSet(viewsets.ModelViewSet):
-    queryset = Attendance.objects.all()
     serializer_class = AttendanceSerializer
     permission_classes = [IsAdminOrTeacher]
 
     def perform_create(self, serializer):
         attendance = serializer.save(recorded_by=self.request.user)
-        
-        # Envoi de SMS en cas d'absence
+
         if attendance.status == 'ABSENT':
             student = attendance.enrollment.student
             school = attendance.enrollment.classroom.cycle.school
             parents = student.parents.filter(role='PARENT')
-            
+
             from core.sms_service import SMSService
-            message = f"SeneSchool Notification: Votre enfant {student.get_full_name()} est marque absent ce jour {attendance.date}."
-            
+            message = (
+                f"SeneSchool Notification: Votre enfant {student.get_full_name()} est marqué absent "
+                f"le {attendance.date} pour {attendance.subject.name if attendance.subject else 'la journée'}."
+            )
+
             for parent in parents:
                 if parent.phone_number:
                     SMSService.send_sms(school, parent.phone_number, message)
 
-
     def get_queryset(self):
         user = self.request.user
+        if not user.is_authenticated:
+            return Attendance.objects.none()
+
+        queryset = Attendance.objects.all().select_related('enrollment__student', 'enrollment__classroom', 'recorded_by', 'subject')
+        query_params = getattr(self.request, 'query_params', self.request.GET)
+
+        classroom_id = query_params.get('classroom')
+        if classroom_id:
+            queryset = queryset.filter(enrollment__classroom_id=classroom_id)
+
+        date = query_params.get('date')
+        if date:
+            queryset = queryset.filter(date=date)
+
+        month = query_params.get('month')
+        if month:
+            queryset = queryset.filter(date__month=month)
+
+        year = query_params.get('year')
+        if year:
+            queryset = queryset.filter(date__year=year)
+
         if user.role == 'ELEVE':
-            return Attendance.objects.filter(enrollment__student=user)
-        return Attendance.objects.all()
+            return queryset.filter(enrollment__student=user)
+        elif user.role == 'PARENT':
+            return queryset.filter(enrollment__student__parents=user)
+        elif user.school:
+            return queryset.filter(enrollment__classroom__cycle__school=user.school)
+        return queryset
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
-        from django.db.models import Count
-        classroom_id = request.query_params.get('classroom')
-        date = request.query_params.get('date')
-        
-        queryset = Attendance.objects.all()
+        from datetime import date as dt_date
+
+        query_params = getattr(request, 'query_params', request.GET)
+        classroom_id = query_params.get('classroom')
+        date_param = query_params.get('date')
+        month = query_params.get('month')
+        year = query_params.get('year')
+
+        queryset = self.get_queryset()
         if classroom_id:
             queryset = queryset.filter(enrollment__classroom_id=classroom_id)
-        if date:
-            queryset = queryset.filter(date=date)
-            
+        if date_param:
+            queryset = queryset.filter(date=date_param)
+        else:
+            queryset = queryset.filter(date=dt_date.today())
+        if month:
+            queryset = queryset.filter(date__month=month)
+        if year:
+            queryset = queryset.filter(date__year=year)
+
         stats = queryset.values('status').annotate(total=Count('id'))
-        return Response(stats)
+        pending_absences = queryset.filter(status='ABSENT', is_validated=False).count()
+        today_absences = queryset.filter(status='ABSENT').count()
+        absent_students_today = queryset.filter(status='ABSENT').values('enrollment').distinct().count()
+        classes_affected = list(queryset.filter(status='ABSENT').values_list('enrollment__classroom__name', flat=True).distinct())
+        recorded_by = list(queryset.filter(status='ABSENT').values_list('recorded_by__first_name', 'recorded_by__last_name').distinct())
+        attendance_rate = 100 if queryset.count() == 0 else round((queryset.filter(status='PRESENT').count() / queryset.count()) * 100, 2)
+
+        return Response({
+            'stats': list(stats),
+            'pending_absences': pending_absences,
+            'today_absences': today_absences,
+            'absent_students_today': absent_students_today,
+            'classes_affected': classes_affected,
+            'recorded_by': [{'first_name': first_name, 'last_name': last_name} for first_name, last_name in recorded_by],
+            'attendance_rate': attendance_rate,
+        })
+
+    @action(detail=True, methods=['patch'])
+    def validate(self, request, pk=None):
+        attendance = self.get_object()
+        if request.user.role not in ['ADMIN', 'DIRECTION']:
+            return Response({'detail': 'Seul l’administration peut valider une absence.'}, status=status.HTTP_403_FORBIDDEN)
+
+        attendance.is_validated = request.data.get('is_validated', True)
+        attendance.observation = request.data.get('observation', attendance.observation)
+        attendance.save(update_fields=['is_validated', 'observation'])
+        return Response(AttendanceSerializer(attendance).data)
+
+    @action(detail=False, methods=['get'])
+    def export_pdf(self, request):
+        from django.http import HttpResponse
+        from .utils import generate_attendance_report_pdf
+        
+        # Obtenir les absences filtrées selon les permissions de l'utilisateur
+        queryset = self.get_queryset()
+        
+        # Filtres supplémentaires
+        start_date = request.query_params.get('start_date')
+        if start_date:
+            queryset = queryset.filter(date__gte=start_date)
+            
+        end_date = request.query_params.get('end_date')
+        if end_date:
+            queryset = queryset.filter(date__lte=end_date)
+            
+        student_id = request.query_params.get('student')
+        if student_id:
+            queryset = queryset.filter(enrollment__student_id=student_id)
+
+        # Récupérer l'établissement
+        user = request.user
+        school = user.school
+        if not school:
+            from core.models import School
+            school = School.objects.first()
+            
+        if not school:
+            return Response({"error": "Établissement non trouvé."}, status=status.HTTP_404_NOT_FOUND)
+            
+        classroom_name = None
+        classroom_id = request.query_params.get('classroom')
+        if classroom_id:
+            from core.models import ClassRoom
+            try:
+                classroom_name = ClassRoom.objects.get(id=classroom_id).name
+            except ClassRoom.DoesNotExist:
+                pass
+                
+        student_name = None
+        if student_id:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                student_name = User.objects.get(id=student_id).get_full_name()
+            except User.DoesNotExist:
+                pass
+
+        pdf = generate_attendance_report_pdf(
+            school=school,
+            attendances=list(queryset.select_related('enrollment__student', 'enrollment__classroom', 'subject')),
+            classroom_name=classroom_name,
+            student_name=student_name,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="rapport_absences.pdf"'
+        return response

@@ -97,6 +97,11 @@ class TimetableEntry(models.Model):
 
 class TeachingPointage(models.Model):
     """Enregistrement de la présence réelle de l'enseignant pour une séance"""
+    class StatusChoices(models.TextChoices):
+        PENDING = 'PENDING', _('En attente')
+        VALIDATED = 'VALIDATED', _('Validé')
+        REFUSED = 'REFUSED', _('Refusé')
+
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='teaching_pointages', verbose_name=_("Enseignant"))
     classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, verbose_name=_("Classe enseignée"))
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, verbose_name=_("Matière"))
@@ -104,6 +109,8 @@ class TeachingPointage(models.Model):
     hours_count = models.PositiveIntegerField(default=1, verbose_name=_("Nombre d'heures effectuées"))
     topic = models.CharField(max_length=255, blank=True, null=True, verbose_name=_("Chapitre/Sujet abordé"))
     is_validated = models.BooleanField(default=False, verbose_name=_("Validé par l'Admin"))
+    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING, verbose_name=_("Statut"))
+    remark = models.TextField(blank=True, null=True, verbose_name=_("Remarque de l'administration"))
 
     def __str__(self):
         return f"{self.teacher.get_full_name()} - {self.date} - {self.hours_count}h"

@@ -27,11 +27,24 @@ class Attendance(models.Model):
         ABSENT = 'ABSENT', _('Absent')
         LATE = 'LATE', _('En retard')
 
+    class MotiveChoices(models.TextChoices):
+        MALADIE = 'MALADIE', _('Maladie')
+        JUSTIFIEE = 'JUSTIFIEE', _('Absence justifiée')
+        NON_JUSTIFIEE = 'NON_JUSTIFIEE', _('Absence non justifiée')
+        AUTRE = 'AUTRE', _('Autre')
+
     enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE, related_name='attendances', verbose_name=_("Élève inscrit"))
     date = models.DateField(verbose_name=_("Date"))
     status = models.CharField(max_length=10, choices=StatusChoices.choices, default=StatusChoices.PRESENT, verbose_name=_("Statut"))
     justification = models.TextField(blank=True, null=True, verbose_name=_("Justification (si absent/retard)"))
+    motive = models.CharField(max_length=20, choices=MotiveChoices.choices, blank=True, null=True, verbose_name=_("Motif d'absence"))
+    comment = models.TextField(blank=True, null=True, verbose_name=_("Commentaire de l'enseignant"))
+    subject = models.ForeignKey('academics.Subject', on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Matière"))
+    is_validated = models.BooleanField(default=False, verbose_name=_("Validé par l'Admin"))
+    observation = models.TextField(blank=True, null=True, verbose_name=_("Observation de l'Admin"))
     recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='recorded_attendances', verbose_name=_("Enregistré par"))
+    from django.utils import timezone
+    created_at = models.DateTimeField(default=timezone.now, verbose_name=_("Date et heure de déclaration"))
 
     def __str__(self):
         return f"{self.enrollment.student.get_full_name()} - {self.date} - {self.get_status_display()}"
@@ -39,4 +52,4 @@ class Attendance(models.Model):
     class Meta:
         verbose_name = _("Pointage")
         verbose_name_plural = _("Pointages")
-        unique_together = ('enrollment', 'date') # Un seul pointage global par jour pour l'instant (peut être affiné par matière plus tard)
+        unique_together = ('enrollment', 'date', 'subject') # Permet d'avoir un pointage par matière par jour

@@ -14,6 +14,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
     student_name = serializers.ReadOnlyField(source='enrollment.student.get_full_name')
     classroom_name = serializers.ReadOnlyField(source='enrollment.classroom.name')
     recorded_by_name = serializers.ReadOnlyField(source='recorded_by.get_full_name')
+    subject_name = serializers.ReadOnlyField(source='subject.name')
 
     class Meta:
         model = Attendance

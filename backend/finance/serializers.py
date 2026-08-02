@@ -9,6 +9,9 @@ class FeeTypeSerializer(serializers.ModelSerializer):
 
 class PaymentSerializer(serializers.ModelSerializer):
     recorded_by_name = serializers.ReadOnlyField(source='recorded_by.get_full_name')
+    student_name = serializers.ReadOnlyField(source='fee_allocation.enrollment.student.get_full_name')
+    classroom_name = serializers.ReadOnlyField(source='fee_allocation.enrollment.classroom.name')
+    fee_type_name = serializers.ReadOnlyField(source='fee_allocation.fee_type.name')
     
     class Meta:
         model = Payment

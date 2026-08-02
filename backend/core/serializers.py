@@ -27,9 +27,18 @@ class ClassRoomSerializer(serializers.ModelSerializer):
         model = ClassRoom
         fields = '__all__'
 
-from .models import SMSLog
+from .models import SMSLog, SchoolEvent
 
 class SMSLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = SMSLog
         fields = '__all__'
+
+class SchoolEventSerializer(serializers.ModelSerializer):
+    event_type_display = serializers.ReadOnlyField(source='get_event_type_display')
+
+    class Meta:
+        model = SchoolEvent
+        fields = '__all__'
+        read_only_fields = ('school',)
+

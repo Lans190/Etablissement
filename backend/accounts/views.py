@@ -103,7 +103,7 @@ class CurrentUserView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        serializer = UserSerializer(request.user)
+        serializer = UserSerializer(request.user, context={'request': request})
         return Response(serializer.data)
 
 class RegisterSchoolView(APIView):
@@ -115,21 +115,26 @@ class RegisterSchoolView(APIView):
             with transaction.atomic():
                 # 1. Créer l'école
                 school = School.objects.create(
-                name=data.get('school_name'),
-                address=data.get('school_address', ''),
-                phone_number=data.get('school_phone', '')
-            )
+                    name=data.get('school_name'),
+                    address=data.get('school_address', ''),
+                    phone_number=data.get('school_phone', '')
+                )
+                
+                # Créer les cycles par défaut pour cette école
+                from core.models import Cycle
+                for cycle_name in ['PRIMAIRE', 'COLLEGE', 'LYCEE']:
+                    Cycle.objects.create(school=school, name=cycle_name)
             
-            # 2. Créer l'utilisateur Administrateur / Directeur
-            user = User.objects.create_user(
-                username=data.get('admin_username'),
-                password=data.get('admin_password'),
-                first_name=data.get('admin_first_name', ''),
-                last_name=data.get('admin_last_name', ''),
-                email=data.get('admin_email', ''),
-                role='DIRECTION',
-                school=school
-            )
+                # 2. Créer l'utilisateur Administrateur / Directeur
+                user = User.objects.create_user(
+                    username=data.get('admin_username'),
+                    password=data.get('admin_password'),
+                    first_name=data.get('admin_first_name', ''),
+                    last_name=data.get('admin_last_name', ''),
+                    email=data.get('admin_email', ''),
+                    role='DIRECTION',
+                    school=school
+                )
             
             return Response({"message": "École et compte administrateur créés avec succès."}, status=status.HTTP_201_CREATED)
         except Exception as e:

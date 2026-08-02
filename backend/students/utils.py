@@ -192,3 +192,164 @@ def generate_student_id_card_pdf(enrollment):
     pdf = buffer.getvalue()
     buffer.close()
     return pdf
+
+def generate_attendance_report_pdf(school, attendances, classroom_name=None, student_name=None, start_date=None, end_date=None):
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from io import BytesIO
+    import os
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'ReportTitle',
+        parent=styles['Heading1'],
+        fontSize=20,
+        leading=24,
+        textColor=colors.HexColor("#0f172a"),
+        alignment=1,
+        spaceAfter=15
+    )
+    
+    meta_style = ParagraphStyle(
+        'ReportMeta',
+        fontSize=9,
+        leading=13,
+        textColor=colors.HexColor("#475569")
+    )
+
+    table_header_style = ParagraphStyle(
+        'TableHeader',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.white,
+        fontName='Helvetica-Bold'
+    )
+
+    table_cell_style = ParagraphStyle(
+        'TableCell',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor("#1e293b")
+    )
+
+    elements = []
+    
+    # 1. School Header
+    header_text = f"<b>{school.name.upper()}</b><br/>"
+    if school.address:
+        header_text += f"{school.address}<br/>"
+    if school.phone_number:
+        header_text += f"Tél: {school.phone_number} | "
+    if school.email:
+        header_text += f"Email: {school.email}"
+    
+    header_p = Paragraph(header_text, ParagraphStyle('HeaderStyle', fontSize=9, leading=13, textColor=colors.HexColor("#334155")))
+    elements.append(header_p)
+    elements.append(Spacer(1, 15))
+    
+    # 2. Title
+    elements.append(Paragraph("RAPPORT D'ABSENCES & D'ASSIDUITÉ", title_style))
+    
+    # 3. Meta information block
+    meta_text = ""
+    if classroom_name:
+        meta_text += f"<b>Classe:</b> {classroom_name} &nbsp;&nbsp;&nbsp;&nbsp;"
+    if student_name:
+        meta_text += f"<b>Élève:</b> {student_name} &nbsp;&nbsp;&nbsp;&nbsp;"
+    
+    date_str = "Toutes les dates"
+    if start_date and end_date:
+        date_str = f"Du {start_date} au {end_date}"
+    elif start_date:
+        date_str = f"Depuis le {start_date}"
+    elif end_date:
+        date_str = f"Jusqu'au {end_date}"
+    
+    meta_text += f"<b>Période:</b> {date_str}"
+    elements.append(Paragraph(meta_text, meta_style))
+    elements.append(Spacer(1, 15))
+    
+    # 4. Statistics summary cards
+    total_records = len(attendances)
+    absences_count = sum(1 for a in attendances if a.status == 'ABSENT')
+    lates_count = sum(1 for a in attendances if a.status == 'LATE')
+    presents_count = sum(1 for a in attendances if a.status == 'PRESENT')
+    
+    rate = 100
+    if total_records > 0:
+        rate = round(((presents_count + lates_count) / total_records) * 100)
+    
+    stats_data = [
+        [
+            Paragraph(f"<b>Total Appels:</b> {total_records}", meta_style),
+            Paragraph(f"<b>Absences:</b> {absences_count}", meta_style),
+            Paragraph(f"<b>Retards:</b> {lates_count}", meta_style),
+            Paragraph(f"<b>Taux d'Assiduité:</b> {rate}%", meta_style)
+        ]
+    ]
+    stats_table = Table(stats_data, colWidths=[130, 130, 130, 142])
+    stats_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#e2e8f0")),
+        ('PADDING', (0,0), (-1,-1), 8),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+    ]))
+    elements.append(stats_table)
+    elements.append(Spacer(1, 20))
+    
+    # 5. Data Table
+    table_data = [
+        [
+            Paragraph("<b>Date</b>", table_header_style),
+            Paragraph("<b>Élève</b>", table_header_style),
+            Paragraph("<b>Classe</b>", table_header_style),
+            Paragraph("<b>Matière</b>", table_header_style),
+            Paragraph("<b>Statut / Motif</b>", table_header_style),
+            Paragraph("<b>Commentaire / Justification</b>", table_header_style)
+        ]
+    ]
+    
+    status_map = {'PRESENT': 'Présent', 'ABSENT': 'Absent', 'LATE': 'Retard'}
+    
+    for a in attendances:
+        subject_name = a.subject.name if a.subject else "-"
+        status_display = status_map.get(a.status, a.status)
+        if a.motive:
+            status_display += f" ({a.get_motive_display()})"
+            
+        comment_display = a.comment or a.justification or "-"
+        if a.is_validated:
+            comment_display += " [Validé]"
+            
+        table_data.append([
+            Paragraph(str(a.date), table_cell_style),
+            Paragraph(a.enrollment.student.get_full_name(), table_cell_style),
+            Paragraph(a.enrollment.classroom.name, table_cell_style),
+            Paragraph(subject_name, table_cell_style),
+            Paragraph(status_display, table_cell_style),
+            Paragraph(comment_display, table_cell_style)
+        ])
+        
+    data_table = Table(table_data, colWidths=[65, 110, 75, 75, 95, 112])
+    data_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#0f172a")),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('PADDING', (0,0), (-1,-1), 5),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#cbd5e1")),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#f8fafc")])
+    ]))
+    
+    elements.append(data_table)
+    doc.build(elements)
+    pdf = buffer.getvalue()
+    buffer.close()
+    return pdf
+

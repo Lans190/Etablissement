@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import api from '@/api/axios';
 import { Settings as SettingsIcon, Save, Camera, Loader2, MapPin, Phone, Mail, Building, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Settings() {
+  const { setUserProfile } = useOutletContext<any>() || {};
   const [activeSubTab, setActiveSubTab] = useState<'profile' | 'classes' | 'subjects' | 'allocations' | 'timeslots'>('profile');
   const [school, setSchool] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
+
   // Core configurations
-  const [subjects, setSubjects]     = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [allocations, setAllocations] = useState([]);
   const [classrooms, setClassrooms] = useState([]);
-  const [teachers, setTeachers]     = useState([]);
-  const [cycles, setCycles]         = useState([]);
-  const [timeslots, setTimeslots]   = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [cycles, setCycles] = useState([]);
+  const [timeslots, setTimeslots] = useState([]);
 
   // Form states
   const [schoolData, setSchoolData] = useState({
@@ -39,8 +42,8 @@ export default function Settings() {
 
   // ── Gestion des Classes ────────────────────────────────────────────────
   const LEVELS_PRIMAIRE = [
-    { value: 'CI',  label: 'CI – Cours d\'Initiation' },
-    { value: 'CP',  label: 'CP – Cours Préparatoire' },
+    { value: 'CI', label: 'CI – Cours d\'Initiation' },
+    { value: 'CP', label: 'CP – Cours Préparatoire' },
     { value: 'CE1', label: 'CE1 – Cours Élémentaire 1' },
     { value: 'CE2', label: 'CE2 – Cours Élémentaire 2' },
     { value: 'CM1', label: 'CM1 – Cours Moyen 1' },
@@ -53,20 +56,20 @@ export default function Settings() {
     { value: '3EME', label: '3ème' },
   ];
   const LEVELS_LYCEE = [
-    { value: 'SECONDE',   label: 'Seconde' },
-    { value: 'PREMIERE',  label: '1ère' },
+    { value: 'SECONDE', label: 'Seconde' },
+    { value: 'PREMIERE', label: '1ère' },
     { value: 'TERMINALE', label: 'Terminale' },
   ];
   const SERIES_LYCEE = [
     { value: 'AUCUNE', label: 'Aucune (sans série)' },
-    { value: 'S1',   label: 'S1 – Maths & Sciences Physiques' },
-    { value: 'S2',   label: 'S2 – Sciences Naturelles' },
-    { value: 'S3',   label: 'S3 – Sciences et Technologies' },
-    { value: 'S4',   label: 'S4 – Sciences et Techn. Industrielles' },
-    { value: 'L1',   label: 'L1 – Lettres & Sciences Humaines' },
-    { value: 'L2',   label: 'L2 – Arabe & Sciences Humaines' },
+    { value: 'S1', label: 'S1 – Maths & Sciences Physiques' },
+    { value: 'S2', label: 'S2 – Sciences Naturelles' },
+    { value: 'S3', label: 'S3 – Sciences et Technologies' },
+    { value: 'S4', label: 'S4 – Sciences et Techn. Industrielles' },
+    { value: 'L1', label: 'L1 – Lettres & Sciences Humaines' },
+    { value: 'L2', label: 'L2 – Arabe & Sciences Humaines' },
     { value: 'STEG', label: 'STEG – Sciences Éco. & Gestion' },
-    { value: 'G',    label: 'G – Gestion' },
+    { value: 'G', label: 'G – Gestion' },
   ];
 
   const getCycleLevels = (cycleId: string) => {
@@ -74,8 +77,8 @@ export default function Settings() {
     if (!cycle) return [];
     const name = cycle.name?.toUpperCase();
     if (name === 'PRIMAIRE') return LEVELS_PRIMAIRE;
-    if (name === 'COLLEGE')  return LEVELS_COLLEGE;
-    if (name === 'LYCEE')    return LEVELS_LYCEE;
+    if (name === 'COLLEGE') return LEVELS_COLLEGE;
+    if (name === 'LYCEE') return LEVELS_LYCEE;
     return [];
   };
 
@@ -144,9 +147,22 @@ export default function Settings() {
     }
 
     try {
-      await api.patch(`core/schools/${school.id}/`, data, {
+      const response = await api.patch(`core/schools/${school.id}/`, data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
+      const currentProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
+      const updatedProfile = {
+        ...currentProfile,
+        school_name: response.data.name,
+        school_logo: response.data.logo || currentProfile.school_logo,
+        school_address: response.data.address,
+        school_phone: response.data.phone_number,
+        school_email: response.data.email,
+      };
+      localStorage.setItem('user_profile', JSON.stringify(updatedProfile));
+      if (setUserProfile) {
+        setUserProfile(updatedProfile);
+      }
       alert("Paramètres mis à jour !");
     } catch (error) {
       alert("Erreur lors de la sauvegarde.");
@@ -233,10 +249,10 @@ export default function Settings() {
     setSaving(true);
     try {
       await api.post('core/classrooms/', {
-        name:     newClass.name,
-        cycle:    parseInt(newClass.cycle),
-        level:    newClass.level,
-        series:   isLycee(newClass.cycle) ? newClass.series : 'AUCUNE',
+        name: newClass.name,
+        cycle: parseInt(newClass.cycle),
+        level: newClass.level,
+        series: isLycee(newClass.cycle) ? newClass.series : 'AUCUNE',
         capacity: parseInt(newClass.capacity),
       });
       setNewClass({ name: '', cycle: newClass.cycle, level: '', series: 'AUCUNE', capacity: '30' });
@@ -301,18 +317,17 @@ export default function Settings() {
       {/* Tabs Menu */}
       <div className="flex border-b border-gray-200 space-x-6 mb-6 overflow-x-auto">
         {([
-          { key: 'profile',     label: 'Identité de l\'École' },
-          { key: 'classes',     label: 'Classes' },
-          { key: 'timeslots',   label: 'Créneaux Horaires' },
-          { key: 'subjects',    label: 'Matières' },
+          { key: 'profile', label: 'Identité de l\'École' },
+          { key: 'classes', label: 'Classes' },
+          { key: 'timeslots', label: 'Créneaux Horaires' },
+          { key: 'subjects', label: 'Matières' },
           { key: 'allocations', label: 'Attribution des Cours' },
         ] as const).map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveSubTab(tab.key)}
-            className={`pb-4 text-sm font-bold whitespace-nowrap transition-all relative ${
-              activeSubTab === tab.key ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900'
-            }`}
+            className={`pb-4 text-sm font-bold whitespace-nowrap transition-all relative ${activeSubTab === tab.key ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900'
+              }`}
           >
             {tab.label}
             {activeSubTab === tab.key && (

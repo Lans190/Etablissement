@@ -9,7 +9,9 @@ class SubjectSerializer(serializers.ModelSerializer):
 class SubjectAllocationSerializer(serializers.ModelSerializer):
     subject_name = serializers.ReadOnlyField(source='subject.name')
     classroom_name = serializers.ReadOnlyField(source='classroom.name')
+    classroom_cycle = serializers.ReadOnlyField(source='classroom.cycle.get_name_display')
     teacher_name = serializers.ReadOnlyField(source='teacher.get_full_name')
+    teacher_email = serializers.ReadOnlyField(source='teacher.email')
 
     class Meta:
         model = SubjectAllocation

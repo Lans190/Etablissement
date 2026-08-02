@@ -1,4 +1,6 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from .models import Subject, SubjectAllocation, DiaryEntry
 from .serializers import SubjectSerializer, SubjectAllocationSerializer, DiaryEntrySerializer
 
@@ -31,7 +33,7 @@ class SubjectViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrDirection]
 
 class SubjectAllocationViewSet(viewsets.ModelViewSet):
-    queryset = SubjectAllocation.objects.none()  # Requis par le router DRF pour détecter le basename
+    queryset = SubjectAllocation.objects.none()
     serializer_class = SubjectAllocationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -39,14 +41,11 @@ class SubjectAllocationViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user.is_authenticated:
             return SubjectAllocation.objects.none()
-        # Un enseignant voit seulement ses propres allocations
         if user.role == 'ENSEIGNANT':
-            return SubjectAllocation.objects.filter(teacher=user)
-        # Admin/Direction filtrent par école
+            return SubjectAllocation.objects.filter(teacher=user).select_related('subject', 'classroom', 'teacher')
         if user.school:
-            return SubjectAllocation.objects.filter(classroom__cycle__school=user.school)
-        return SubjectAllocation.objects.all()
-
+            return SubjectAllocation.objects.filter(classroom__cycle__school=user.school).select_related('subject', 'classroom', 'teacher')
+        return SubjectAllocation.objects.all().select_related('subject', 'classroom', 'teacher')
 
     def has_create_permission(self, request):
         return request.user.is_authenticated and request.user.role in ['ADMIN', 'DIRECTION']
@@ -56,7 +55,17 @@ class SubjectAllocationViewSet(viewsets.ModelViewSet):
             from rest_framework.response import Response
             from rest_framework import status
             return Response({'detail': 'Permission refusée.'}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data.copy()
+        if not data.get('classroom') or not data.get('subject') or not data.get('teacher'):
+            from rest_framework.response import Response
+            from rest_framework import status
+            return Response({'detail': 'Les champs matière, classe et enseignant sont obligatoires.'}, status=status.HTTP_400_BAD_REQUEST)
+
         return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save()
 
 class DiaryEntryViewSet(viewsets.ModelViewSet):
     queryset = DiaryEntry.objects.all()
@@ -97,33 +106,92 @@ class TeachingPointageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = TeachingPointage.objects.all()
+
+        teacher_id = self.request.query_params.get('teacher')
+        if teacher_id:
+            queryset = queryset.filter(teacher_id=teacher_id)
+
+        classroom_id = self.request.query_params.get('classroom')
+        if classroom_id:
+            queryset = queryset.filter(classroom_id=classroom_id)
+
+        subject_id = self.request.query_params.get('subject')
+        if subject_id:
+            queryset = queryset.filter(subject_id=subject_id)
+
+        date = self.request.query_params.get('date')
+        if date:
+            queryset = queryset.filter(date=date)
+
+        month = self.request.query_params.get('month')
+        if month and month != 'ALL':
+            queryset = queryset.filter(date__month=month)
+
+        year = self.request.query_params.get('year')
+        if year and year != 'ALL':
+            queryset = queryset.filter(date__year=year)
+
+        status_value = self.request.query_params.get('status')
+        if status_value:
+            queryset = queryset.filter(status=status_value)
+
         if user.role == 'ENSEIGNANT':
-            return TeachingPointage.objects.filter(teacher=user).order_by('-date')
+            return queryset.filter(teacher=user).order_by('-date')
         if user.school:
-            # Admin voit uniquement les pointages de son école
-            return TeachingPointage.objects.filter(
-                classroom__cycle__school=user.school
-            ).order_by('-date')
-        return TeachingPointage.objects.all().order_by('-date')
+            return queryset.filter(classroom__cycle__school=user.school).order_by('-date')
+        return queryset.order_by('-date')
 
     def perform_create(self, serializer):
-        is_val = False
-        if self.request.user.role in ['ADMIN', 'DIRECTION']:
-            is_val = self.request.data.get('is_validated', False)
-        serializer.save(teacher=self.request.user, is_validated=is_val)
+        serializer.save(teacher=self.request.user, is_validated=False, status='PENDING')
+
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        queryset = self.get_queryset()
+        validated = queryset.filter(status='VALIDATED')
+        pending = queryset.filter(status='PENDING')
+        refused = queryset.filter(status='REFUSED')
+
+        return Response({
+            'total': queryset.count(),
+            'validated': validated.count(),
+            'pending': pending.count(),
+            'refused': refused.count(),
+            'total_hours': sum(item.hours_count or 0 for item in validated),
+            'teachers': list(queryset.values_list('teacher__first_name', 'teacher__last_name').distinct())
+        })
 
     def partial_update(self, request, *args, **kwargs):
-        # ADMIN et DIRECTION peuvent valider le pointage
-        if 'is_validated' in request.data:
+        # Only ADMIN and DIRECTION can validate/refuse/remark pointages
+        restricted_fields = ['is_validated', 'status', 'remark']
+        if any(field in request.data for field in restricted_fields):
             if request.user.role not in ['ADMIN', 'DIRECTION']:
-                from rest_framework.response import Response
-                from rest_framework import status
                 return Response(
-                    {'detail': 'Seul l\u2019administration peut valider le pointage.'},
+                    {'detail': 'Seul l’administration peut valider, refuser ou commenter le pointage.'},
                     status=status.HTTP_403_FORBIDDEN
                 )
-        kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
+        
+        # Copy the data to avoid immutability issues
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        
+        # Auto sync status and is_validated
+        if 'status' in data:
+            stat = data['status']
+            if stat == 'VALIDATED':
+                data['is_validated'] = True
+            else:
+                data['is_validated'] = False
+        elif 'is_validated' in data:
+            is_val = data['is_validated']
+            data['status'] = 'VALIDATED' if is_val else 'PENDING'
+
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response(serializer.data)
+
 
 class ResourceViewSet(viewsets.ModelViewSet):
     serializer_class = ResourceSerializer

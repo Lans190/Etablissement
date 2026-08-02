@@ -133,3 +133,29 @@ class SMSLog(models.Model):
         verbose_name = _("Log SMS")
         verbose_name_plural = _("Logs SMS")
 
+
+class SchoolEvent(models.Model):
+    class EventTypeChoices(models.TextChoices):
+        EXAM = 'EXAM', _('Examen')
+        VACATION = 'VACATION', _('Vacances')
+        REUNION = 'REUNION', _('Réunion')
+        HOLIDAY = 'HOLIDAY', _('Jour Férié')
+        ACTIVITY = 'ACTIVITY', _('Activité Scolaire')
+
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='events', verbose_name=_("Établissement"))
+    title = models.CharField(max_length=200, verbose_name=_("Titre"))
+    event_type = models.CharField(max_length=20, choices=EventTypeChoices.choices, default=EventTypeChoices.ACTIVITY, verbose_name=_("Type d'événement"))
+    start_date = models.DateField(verbose_name=_("Date de début"))
+    end_date = models.DateField(verbose_name=_("Date de fin"))
+    description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
+    color = models.CharField(max_length=7, default='#3b82f6', verbose_name=_("Couleur hexadécimale"))
+
+    def __str__(self):
+        return f"{self.title} ({self.get_event_type_display()})"
+
+    class Meta:
+        verbose_name = _("Événement Scolaire")
+        verbose_name_plural = _("Événements Scolaires")
+        ordering = ['start_date']
+
+

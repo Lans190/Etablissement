@@ -13,8 +13,11 @@ import Timetable from './pages/Timetable';
 import Attendance from './pages/Attendance';
 import Pointage from './pages/Pointage';
 import Resources from './pages/Resources';
+import Courses from './pages/Courses';
 import Bulletins from './pages/Bulletins';
 import Settings from './pages/Settings';
+import CalendarPage from './pages/Calendar';
+import AIAssistant from './pages/AIAssistant';
 import Layout from './components/Layout';
 
 // Garde de route simple (authentification)
@@ -83,8 +86,15 @@ function App() {
           <Route path="attendance" element={<Attendance />} />
           <Route path="pointage" element={<Pointage />} />
           <Route path="resources" element={<Resources />} />
+          <Route path="courses" element={<Courses />} />
           <Route path="bulletins" element={<Bulletins />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="calendar" element={<CalendarPage />} />
+          <Route path="ai-assistant" element={
+            <RoleRoute allowed={['ADMIN', 'DIRECTION']}>
+              <AIAssistant />
+            </RoleRoute>
+          } />
         </Route>
       </Routes>
     </Router>
