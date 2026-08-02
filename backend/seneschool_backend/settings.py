@@ -1,5 +1,6 @@
 import os
 import environ
+import dj_database_url
 from pathlib import Path
 from datetime import timedelta
 
@@ -73,11 +74,20 @@ TEMPLATES = [
 WSGI_APPLICATION = 'seneschool_backend.wsgi.application'
 
 # Database
-if env('DATABASE_URL', default=None):
+# Utilise DATABASE_URL si disponible, sinon utilise les variables individuelles
+DATABASE_URL = env('DATABASE_URL', default=None)
+
+if DATABASE_URL:
+    # Configuration pour Render avec PostgreSQL
     DATABASES = {
-        'default': env.db()
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True  # Important pour Render
+        )
     }
 else:
+    # Configuration pour le développement local
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -122,7 +132,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS
-CORS_ALLOW_ALL_ORIGINS = True # Change in production!
+CORS_ALLOW_ALL_ORIGINS = True  # Change in production!
 
 # Django REST Framework
 REST_FRAMEWORK = {
