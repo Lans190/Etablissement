@@ -312,70 +312,189 @@ class GrokAIAssistantView(APIView):
         if not prompt:
             return Response({"error": "Veuillez poser une question à l'assistant IA."}, status=400)
 
-        # 1. Extraction en direct des métriques de PostgreSQL
+        # 1. Extraction approfondie en direct des métriques de PostgreSQL (calculs 100% exécutés par Django)
         from django.contrib.auth import get_user_model
         from students.models import Enrollment, Attendance
         from finance.models import Payment, Expense, FeeAllocation, Payslip
-        from academics.models import TeachingPointage, SubjectAllocation
+        from academics.models import TeachingPointage, SubjectAllocation, ClassRoom
+        from django.db.models import Sum, Count, Q
+        from datetime import timedelta, date as dt_date
 
         User = get_user_model()
         today = dt_date.today()
+        first_day_this_month = today.replace(day=1)
+        last_month_end = first_day_this_month - timedelta(days=1)
+        first_day_last_month = last_month_end.replace(day=1)
+        start_of_week = today - timedelta(days=today.weekday())
 
+        # A. Effectifs & Classes
         total_students = Enrollment.objects.filter(classroom__cycle__school=school, is_active=True).count()
         total_teachers = User.objects.filter(school=school, role='ENSEIGNANT').count()
         total_classes = ClassRoom.objects.filter(cycle__school=school).count()
 
-        total_recettes = Payment.objects.filter(
+        top_class = ClassRoom.objects.filter(cycle__school=school).annotate(
+            c_count=Count('enrollments', filter=Q(enrollments__is_active=True))
+        ).order_by('-c_count').first()
+        top_class_name = f"{top_class.name} ({top_class.c_count} élèves)" if top_class else "Non définie"
+
+        # B. Finances - Recettes, Dépenses, Mois Actuel vs Dernier
+        recettes_totales = Payment.objects.filter(
             fee_allocation__enrollment__classroom__cycle__school=school
         ).aggregate(total=Sum('amount_paid'))['total'] or 0
 
-        total_depenses = Expense.objects.filter(school=school).aggregate(total=Sum('amount'))['total'] or 0
-        net_balance = total_recettes - total_depenses
+        recettes_mois_actuel = Payment.objects.filter(
+            fee_allocation__enrollment__classroom__cycle__school=school,
+            payment_date__gte=first_day_this_month
+        ).aggregate(total=Sum('amount_paid'))['total'] or 0
 
-        unpaid_count = FeeAllocation.objects.filter(
-            enrollment__classroom__cycle__school=school,
-            is_paid=False
-        ).count()
+        recettes_mois_dernier = Payment.objects.filter(
+            fee_allocation__enrollment__classroom__cycle__school=school,
+            payment_date__gte=first_day_last_month,
+            payment_date__lte=last_month_end
+        ).aggregate(total=Sum('amount_paid'))['total'] or 0
 
-        unpaid_sum = FeeAllocation.objects.filter(
-            enrollment__classroom__cycle__school=school,
-            is_paid=False
+        depenses_totales = Expense.objects.filter(school=school).aggregate(total=Sum('amount'))['total'] or 0
+
+        depenses_mois_actuel = Expense.objects.filter(
+            school=school,
+            date__gte=first_day_this_month
         ).aggregate(total=Sum('amount'))['total'] or 0
 
+        net_balance = recettes_totales - depenses_totales
+
+        # Poste de dépense le plus cher
+        top_expense_cat = Expense.objects.filter(school=school).values('category').annotate(
+            cat_sum=Sum('amount')
+        ).order_by('-cat_sum').first()
+        top_expense_cat_name = f"{top_expense_cat['category']} ({float(top_expense_cat['cat_sum']):,.0f} FCFA)" if top_expense_cat else "Aucune dépense"
+
+        # Impayés et Acomptes
+        unpaid_allocations = FeeAllocation.objects.filter(
+            enrollment__classroom__cycle__school=school,
+            is_paid=False
+        )
+        unpaid_count = unpaid_allocations.count()
+        unpaid_sum = unpaid_allocations.aggregate(total=Sum('amount'))['total'] or 0
+
+        # Liste des élèves en impayé
+        unpaid_students_qs = unpaid_allocations.select_related('enrollment__student', 'enrollment__classroom')[:10]
+        unpaid_students_list = [
+            f"{a.enrollment.student.get_full_name()} ({a.enrollment.classroom.name}) : reste {float(a.amount - a.amount_paid):,.0f} FCFA"
+            for a in unpaid_students_qs
+        ]
+
+        # Acomptes
+        acomptes_qs = FeeAllocation.objects.filter(
+            enrollment__classroom__cycle__school=school,
+            amount_paid__gt=0,
+            is_paid=False
+        )
+        acomptes_count = acomptes_qs.count()
+        acomptes_list = [
+            f"{a.enrollment.student.get_full_name()} ({a.enrollment.classroom.name}) : payé {float(a.amount_paid):,.0f} / {float(a.amount):,.0f} FCFA"
+            for a in acomptes_qs.select_related('enrollment__student', 'enrollment__classroom')[:10]
+        ]
+
+        # C. Enseignants & Salaires
+        teachers_qs = User.objects.filter(school=school, role='ENSEIGNANT')
+        teachers_payroll_summary = []
+        for t in teachers_qs:
+            h_count = TeachingPointage.objects.filter(
+                teacher=t,
+                status='VALIDATED'
+            ).aggregate(total=Sum('hours_count'))['total'] or 0
+            h_rate = float(t.hourly_rate or 0)
+            base_sal = float(t.base_salary or 0)
+            allowances = float(t.allowances or 0)
+            deductions = float(t.deductions or 0)
+            calculated_salary = (h_count * h_rate) + base_sal + allowances - deductions
+            teachers_payroll_summary.append({
+                "nom": t.get_full_name(),
+                "heures": float(h_count),
+                "taux": h_rate,
+                "base": base_sal,
+                "primes": allowances,
+                "cotisations": deductions,
+                "salaire_net": calculated_salary
+            })
+
+        # D. Présences & Absences
         today_absences = Attendance.objects.filter(
             enrollment__classroom__cycle__school=school,
             date=today,
             status='ABSENT'
         ).count()
 
-        top_teachers = TeachingPointage.objects.filter(
-            classroom__cycle__school=school,
-            status='VALIDATED'
-        ).values('teacher__first_name', 'teacher__last_name').annotate(total_h=Sum('hours_count')).order_by('-total_h')[:5]
+        # Taux de présence cette semaine
+        week_attendances = Attendance.objects.filter(
+            enrollment__classroom__cycle__school=school,
+            date__gte=start_of_week
+        )
+        total_week_records = week_attendances.count()
+        present_week_records = week_attendances.filter(status='PRESENT').count()
+        week_presence_rate = round((present_week_records / total_week_records * 100), 1) if total_week_records > 0 else 100.0
 
-        teacher_hours_summary = [f"{t['teacher__first_name']} {t['teacher__last_name']}: {t['total_h']}h" for t in top_teachers]
+        # Classe la plus absente
+        worst_class_abs = ClassRoom.objects.filter(cycle__school=school).annotate(
+            abs_c=Count('enrollments__attendances', filter=Q(enrollments__attendances__status='ABSENT'))
+        ).order_by('-abs_c').first()
+        worst_class_abs_name = f"{worst_class_abs.name} ({worst_class_abs.abs_c} absences)" if worst_class_abs else "Aucune"
+
+        # Élèves les plus absents
+        top_absent_students_qs = Attendance.objects.filter(
+            enrollment__classroom__cycle__school=school,
+            status='ABSENT'
+        ).values('enrollment__student__first_name', 'enrollment__student__last_name', 'enrollment__classroom__name').annotate(
+            total_abs=Count('id')
+        ).order_by('-total_abs')[:5]
+
+        top_absent_students_list = [
+            f"{s['enrollment__student__first_name']} {s['enrollment__student__last_name']} ({s['enrollment__classroom__name']}) : {s['total_abs']} absence(s)"
+            for s in top_absent_students_qs
+        ]
 
         context_data = {
             "nom_etablissement": school.name if school else "Établissement",
-            "effectif_eleves": total_students,
-            "effectif_enseignants": total_teachers,
-            "total_classes": total_classes,
-            "recettes_totales_fcfa": float(total_recettes),
-            "depenses_totales_fcfa": float(total_depenses),
-            "benefice_net_fcfa": float(net_balance),
-            "frais_impayes_nombre": unpaid_count,
-            "montant_impayes_estime_fcfa": float(unpaid_sum),
-            "absences_aujourdhui": today_absences,
-            "top_enseignants_heures": teacher_hours_summary,
-            "date_du_jour": str(today)
+            "date_du_jour": str(today),
+            "effectifs": {
+                "total_eleves": total_students,
+                "total_enseignants": total_teachers,
+                "total_classes": total_classes,
+                "classe_la_plus_peuplee": top_class_name,
+            },
+            "finances_calculs_django": {
+                "recettes_totales_fcfa": float(recettes_totales),
+                "recettes_mois_actuel_fcfa": float(recettes_mois_actuel),
+                "recettes_mois_dernier_fcfa": float(recettes_mois_dernier),
+                "depenses_totales_fcfa": float(depenses_totales),
+                "depenses_mois_actuel_fcfa": float(depenses_mois_actuel),
+                "benefice_net_fcfa": float(net_balance),
+                "poste_depense_le_plus_cher": top_expense_cat_name,
+                "impayes": {
+                    "nombre": unpaid_count,
+                    "montant_total_fcfa": float(unpaid_sum),
+                    "exemples_eleves": unpaid_students_list
+                },
+                "acomptes": {
+                    "nombre": acomptes_count,
+                    "exemples_eleves": acomptes_list
+                }
+            },
+            "enseignants_et_paie_calculs_django": teachers_payroll_summary,
+            "presences_et_absences_calculs_django": {
+                "taux_presence_semaine_pct": week_presence_rate,
+                "absences_aujourdhui": today_absences,
+                "classe_la_plus_absente": worst_class_abs_name,
+                "eleves_les_plus_absents": top_absent_students_list
+            }
         }
 
         system_instruction = (
-            f"Vous êtes l'Assistant IA officiel d'analyse de données pour l'établissement scolaire {context_data['nom_etablissement']}.\n"
-            "Vous répondez exclusivement sur la base des données réelles ci-dessous extraites directement de PostgreSQL.\n"
-            "Soyez précis, professionnel, avec un ton structuré et constructif (utilisez le symbole FCFA, des puces de texte, des tableaux en Markdown si pertinent).\n"
-            "Ne réinventez pas les chiffres. Si une donnée n'est pas disponible, indiquez-le clairement.\n\n"
-            f"DONNÉES EN TEMPS RÉEL DE L'ÉTABLISSEMENT:\n{json.dumps(context_data, ensure_ascii=False, indent=2)}\n"
+            f"Vous êtes l'Assistant IA officiel d'analyse et de rédaction de rapports pour l'établissement scolaire {context_data['nom_etablissement']}.\n"
+            "RÈGLE N°1 CRITIQUE : Tous les calculs financiers (recettes, dépenses, bénéfices, salaires, taux de présence) ont DÉJÀ ÉTÉ CALCULÉS AVEC EXACTITUDE PAR DJANGO dans les données ci-dessous.\n"
+            "Vous NE DEVEZ PAS réinventer ou recalculer ces chiffres. Votre rôle est d'analyser, d'expliquer, de comparer, de résumer et de rédiger des rapports structurés et professionnels.\n"
+            "Utilisez le symbole FCFA, des puces claires, du gras et des tableaux en Markdown si pertinent.\n\n"
+            f"DONNÉES OFFICIELLES CALCULÉES PAR DJANGO:\n{json.dumps(context_data, ensure_ascii=False, indent=2)}\n"
         )
 
         from django.conf import settings
@@ -415,48 +534,111 @@ class GrokAIAssistantView(APIView):
                         return Response({
                             "answer": ai_reply,
                             "context": context_data,
-                            "source": f"API Grok xAI ({model_name})"
+                            "source": f"API IA xAI ({model_name})"
                         })
                 except Exception:
                     continue
 
-        # Fallback intelligent basé sur les règles métier si la clé API n'est pas encore saisie
+        # Fallback intelligent 100% calculé par Django pour toutes les questions prédéfinies
         prompt_lower = prompt.lower()
-        if "recette" in prompt_lower or "revenu" in prompt_lower or "finan" in prompt_lower or "bénéfice" in prompt_lower or "depense" in prompt_lower or "bilan" in prompt_lower:
+
+        # 1. Comparatif / Mensuel / Recettes / Dépenses / Bénéfice
+        if any(w in prompt_lower for w in ["mois", "actuel", "dernier", "compare", "janvier", "février", "poste", "dépense", "bénéfice", "recette", "encais"]) and not "rapport" in prompt_lower:
             reply = (
-                f"### 📊 Rapport Financier - {context_data['nom_etablissement']}\n\n"
-                f"- **Recettes Totales Encaissees :** `{context_data['recettes_totales_fcfa']:,.0f} FCFA`\n"
-                f"- **Dépenses Totales :** `{context_data['depenses_totales_fcfa']:,.0f} FCFA`\n"
-                f"- **Résultat Net / Bénéfice :** `{context_data['benefice_net_fcfa']:,.0f} FCFA`\n"
-                f"- **Montant Reste à Encaisser (Impayés) :** `{context_data['montant_impayes_estime_fcfa']:,.0f} FCFA` ({context_data['frais_impayes_nombre']} échéances)\n\n"
-                "💡 **Recommandation :** Relancer en priorité les parents ayant des échéances impayées pour optimiser la trésorerie mensuelle."
+                f"### 💰 Bilan & Analyse Financière Mensuelle - {context_data['nom_etablissement']}\n\n"
+                f"*Tous les chiffres ci-dessous sont issus du calcul automatique par le moteur Django :*\n\n"
+                f"- **Recettes ce mois-ci :** `{recettes_mois_actuel:,.0f} FCFA`\n"
+                f"- **Recettes le mois dernier :** `{recettes_mois_dernier:,.0f} FCFA`\n"
+                f"- **Variation Mensuelle :** `{('+' if recettes_mois_actuel >= recettes_mois_dernier else '')}{float(recettes_mois_actuel - recettes_mois_dernier):,.0f} FCFA`\n"
+                f"- **Dépenses ce mois-ci :** `{depenses_mois_actuel:,.0f} FCFA` (Dépenses totales cumulées: `{depenses_totales:,.0f} FCFA`)\n"
+                f"- **Poste de dépense le plus élevé :** `{top_expense_cat_name}`\n"
+                f"- **Bénéfice Net Global :** `{net_balance:,.0f} FCFA`\n\n"
+                "💡 **Analyse & Recommandation :** " +
+                ("La dynamique de recettes du mois est positive par rapport au mois précédent." if recettes_mois_actuel >= recettes_mois_dernier else "Les recettes du mois accusent une légère baisse. Une relance des frais de scolarité est conseillée.")
             )
-        elif "enseignant" in prompt_lower or "prof" in prompt_lower or "heure" in prompt_lower or "salaire" in prompt_lower:
-            teachers_str = "\n".join([f"- {t}" for t in teacher_hours_summary]) if teacher_hours_summary else "- Aucun pointage validé enregistré."
+
+        # 2. Impayés & Acomptes
+        elif any(w in prompt_lower for w in ["impayé", "acompte", "pas encore payé", "non payé"]):
+            unpaid_formatted = "\n".join([f"- 🔴 {s}" for s in unpaid_students_list]) if unpaid_students_list else "- Aucun élève en impayé enregistré."
+            acomptes_formatted = "\n".join([f"- 🟠 {s}" for s in acomptes_list]) if acomptes_list else "- Aucun acompte partiel enregistré."
             reply = (
-                f"### 👨‍🏫 Analyse Ressources Humaines & Enseignants\n\n"
-                f"- **Nombre total d'enseignants :** `{total_teachers}`\n"
-                f"- **Volume d'heures validées par enseignant :**\n{teachers_str}\n\n"
-                "💡 **Calcul Automatique :** Le salaire des enseignants est calculé sur la formule `Taux Horaire × Heures Validées + Salaire de Base + Primes - Retenues`."
+                f"### 📋 État des Frais Scolaires & Acomptes\n\n"
+                f"- **Nombre d'échéances impayées :** `{unpaid_count}` (Total cumulé : `{unpaid_sum:,.0f} FCFA`)\n"
+                f"- **Nombre d'élèves avec acompte partiel :** `{acomptes_count}`\n\n"
+                f"#### 🔴 Échantillon d'élèves en impayé :\n{unpaid_formatted}\n\n"
+                f"#### 🟠 Échantillon d'élèves ayant versé un acompte :\n{acomptes_formatted}\n\n"
+                "💡 **Recommandation :** Exportez la liste des relances SMS depuis le module Finance pour notifier automatiquement les responsables."
             )
-        elif "élève" in prompt_lower or "eleve" in prompt_lower or "inscrit" in prompt_lower or "classe" in prompt_lower:
+
+        # 3. Enseignants, Heures & Salaires
+        elif any(w in prompt_lower for w in ["enseignant", "prof", "salaire", "travail", "heure"]):
+            payroll_table = "\n".join([
+                f"| {t['nom']} | {t['heures']} h | {t['taux']:,.0f} F/h | {t['base']:,.0f} F | {t['primes']:,.0f} F | {t['cotisations']:,.0f} F | **{t['salaire_net']:,.0f} FCFA** |"
+                for t in teachers_payroll_summary
+            ]) if teachers_payroll_summary else "| Aucun enseignant | 0 h | 0 F | 0 F | 0 F | 0 F | **0 FCFA** |"
             reply = (
-                f"### 🎓 Synthèse des Effectifs Scolaires\n\n"
-                f"- **Total Élèves Inscrits :** `{total_students}`\n"
-                f"- **Nombre de Classes Ouvertes :** `{total_classes}`\n"
-                f"- **Absences Aujourd'hui ({today}) :** `{today_absences} élève(s)`\n"
+                f"### 👨‍🏫 Gestion RH, Heures Travaillées & Décompte des Salaires\n\n"
+                f"*Formule appliquée par Django : (Heures Validées × Taux Horaire) + Salaire de Base + Primes - Cotisations*\n\n"
+                f"| Enseignant | Heures Validées | Taux/h | Salaire Fixe | Primes | Cotisations | **Salaire Net à Payer** |\n"
+                f"| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n"
+                f"{payroll_table}\n\n"
+                "💡 **Information :** Les fiches de paie mensuelles individuelles peuvent être générées et téléchargées au format PDF dans l'onglet **Finance & Paie RH**."
             )
+
+        # 4. Présences & Absences
+        elif any(w in prompt_lower for w in ["présence", "absence", "taux", "retard", "assiduité"]):
+            top_abs_formatted = "\n".join([f"- ⚠️ {s}" for s in top_absent_students_list]) if top_absent_students_list else "- Aucune absence enregistrée."
+            reply = (
+                f"### 📊 Rapport d'Assiduité & Taux de Présence\n\n"
+                f"- **Taux de Présence cette semaine :** `{week_presence_rate}%`\n"
+                f"- **Absences signalées aujourd'hui ({today}) :** `{today_absences} élève(s)`\n"
+                f"- **Classe avec le plus d'absences :** `{worst_class_abs_name}`\n\n"
+                f"#### ⚠️ Élèves accumulant le plus d'absences :\n{top_abs_formatted}\n\n"
+                "💡 **Action Conseillée :** Planifier un entretien pédagogique avec les parents des élèves cumulant plus de 3 absences non justifiées."
+            )
+
+        # 5. Rapport Annuel / Synthèse Globale
+        elif any(w in prompt_lower for w in ["rapport", "annuel", "synthèse", "global", "complet"]):
+            reply = (
+                f"# 🏛️ RAPPORT ANNUEL & SYNTHÈSE GLOBALE DE L'ÉTABLISSEMENT\n"
+                f"**Établissement :** {context_data['nom_etablissement']}  |  **Date d'édition :** {today}\n\n"
+                "--- \n\n"
+                f"### 1. 🎓 Effectifs & Organisation Pédagogique\n"
+                f"- **Total Élèves Inscrits :** `{total_students}` élèves\n"
+                f"- **Corps Enseignant :** `{total_teachers}` enseignants\n"
+                f"- **Classes Ouvertes :** `{total_classes}` classes (Classe la plus fréquentée: `{top_class_name}`)\n\n"
+                f"### 2. 💰 Bilan Financier Global (Calculs Django)\n"
+                f"- **Recettes Totales Encassées :** `{recettes_totales:,.0f} FCFA`\n"
+                f"- **Dépenses Totales d'Exploitation :** `{depenses_totales:,.0f} FCFA`\n"
+                f"- **Résultat Net d'Exploitation (Bénéfice) :** `{net_balance:,.0f} FCFA`\n"
+                f"- **Poste de Dépense Majeur :** `{top_expense_cat_name}`\n"
+                f"- **Reste à Recouvrer (Impayés) :** `{unpaid_sum:,.0f} FCFA` ({unpaid_count} échéances)\n\n"
+                f"### 3. 📊 Assiduité & Présences\n"
+                f"- **Taux Moyen de Présence Hebdomadaire :** `{week_presence_rate}%`\n"
+                f"- **Classe la Plus Touchée par les Absences :** `{worst_class_abs_name}`\n\n"
+                "--- \n"
+                "🎯 **Conclusion & Recommandations de l'Assistant IA :**\n"
+                "1. **Recouvrement :** Accentuer le suivi des impayés pour récupérer le solde de " + f"`{unpaid_sum:,.0f} FCFA`.\n" +
+                "2. **Maîtrise des Dépenses :** Surveiller particulièrement le poste `" + top_expense_cat_name + "`.\n" +
+                "3. **Pédagogie :** Maintenir la présence au-dessus du seuil de 90% sur toutes les classes."
+            )
+
+        # 6. Question générale par défaut
         else:
             reply = (
                 f"### 🤖 Synthèse Générale - {context_data['nom_etablissement']}\n\n"
-                f"- **Élèves inscrits :** `{total_students}` | **Classes :** `{total_classes}`\n"
-                f"- **Enseignants :** `{total_teachers}`\n"
-                f"- **Recettes encaissees :** `{total_recettes:,.0f} FCFA` | **Dépenses :** `{total_depenses:,.0f} FCFA`\n"
-                f"- **Balance Financière :** `{net_balance:,.0f} FCFA`\n"
-                f"- **Échéances impayées :** `{unpaid_count}` (`{unpaid_sum:,.0f} FCFA`)\n\n"
-                "Tapez une question spécifique pour obtenir un rapport approfondi sur les finances, les présences ou les fiches de paie."
+                f"- **Élèves inscrits :** `{total_students}` | **Enseignants :** `{total_teachers}` | **Classes :** `{total_classes}`\n"
+                f"- **Recettes encaissees :** `{recettes_totales:,.0f} FCFA` | **Dépenses :** `{depenses_totales:,.0f} FCFA`\n"
+                f"- **Résultat Net (Bénéfice) :** `{net_balance:,.0f} FCFA`\n"
+                f"- **Taux de Présence Semaine :** `{week_presence_rate}%`\n\n"
+                "💡 **Vous pouvez me demander :**\n"
+                "• *« Compare le mois actuel au mois dernier »*\n"
+                "• *« Quels sont les élèves qui n'ont pas encore payé ? »*\n"
+                "• *« Combien d'heures cet enseignant a travaillées et calcule son salaire »*\n"
+                "• *« Quel est le taux de présence et quelle classe a le plus d'absences ? »*\n"
+                "• *« Prépare-moi le rapport annuel complet de l'établissement »*"
             )
 
-        return Response({"answer": reply, "context": context_data, "source": "Base de Données PostgreSQL"})
+        return Response({"answer": reply, "context": context_data, "source": "Calculateur Django PostgreSQL"})
 
 

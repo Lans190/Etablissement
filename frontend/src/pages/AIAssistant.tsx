@@ -10,12 +10,12 @@ interface Message {
 }
 
 const QUICK_QUESTIONS = [
-  { icon: '💰', label: 'Bilan financier', prompt: 'Donne-moi un résumé du bilan financier de l\'établissement : recettes, dépenses et solde.' },
-  { icon: '👥', label: 'Absences élèves', prompt: 'Quels sont les élèves qui ont le plus d\'absences ? Y a-t-il des classes particulièrement touchées ?' },
-  { icon: '📊', label: 'Statistiques globales', prompt: 'Fais-moi un résumé complet des statistiques de l\'école : élèves, enseignants, classes, assiduité.' },
-  { icon: '⏰', label: 'Pointage enseignants', prompt: 'Comment se porte le pointage des enseignants ? Y a-t-il des anomalies à signaler ?' },
-  { icon: '📈', label: 'Tendances financières', prompt: 'Analyse les tendances financières et identifie les principaux postes de dépenses.' },
-  { icon: '🎓', label: 'Performance académique', prompt: 'Quel est l\'état général de l\'établissement en termes de présence et d\'organisation pédagogique ?' },
+  { icon: '💰', label: 'Comparatif financier mensuel', prompt: 'Compare les recettes et dépenses de ce mois-ci au mois dernier et donne-moi le bénéfice.' },
+  { icon: '🔴', label: 'Élèves impayés & acomptes', prompt: 'Quels sont les élèves qui n\'ont pas encore payé et combien avons-nous d\'acomptes ?' },
+  { icon: '👨‍🏫', label: 'Salaires & heures enseignants', prompt: 'Combien d\'heures les enseignants ont-ils travaillé et calcule le détail de leurs salaires.' },
+  { icon: '📊', label: 'Taux de présence & absences', prompt: 'Quel est le taux de présence cette semaine et quelle classe a le plus d\'absences ?' },
+  { icon: '🏷️', label: 'Poste de dépense majeur', prompt: 'Quel poste de dépense coûte le plus cher dans l\'établissement ?' },
+  { icon: '🏛️', label: 'Rapport annuel complet', prompt: 'Prépare-moi le rapport annuel complet de l\'établissement.' },
 ];
 
 export default function AIAssistant() {
