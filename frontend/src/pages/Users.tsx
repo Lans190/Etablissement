@@ -212,14 +212,14 @@ export default function Users() {
                     onChange={(e) => setFormData({...formData, role: e.target.value})}
                   >
                     <option value="ELEVE">Élève</option>
-                    <option value="ENSEIGNANT">Enseignant (Professeur)</option>
+                    <option value="ENSEIGNANT">Enseignant</option>
                     <option value="PARENT">Parent</option>
                     <option value="DIRECTION">Direction / Admin École</option>
                   </select>
 
                   {/* Grille Salariale pour les enseignants (Placée immédiatement sous le sélecteur de rôle) */}
-                  {formData.role === 'ENSEIGNANT' && (
-                    <div className="mt-3 bg-indigo-50 p-4 rounded-2xl border border-indigo-200 shadow-sm space-y-3 animate-in fade-in zoom-in duration-150">
+                  {(formData.role === 'ENSEIGNANT' || formData.role === 'TEACHER' || formData.role?.toUpperCase() === 'ENSEIGNANT') && (
+                    <div className="mt-3 bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-300 shadow-md space-y-3 animate-in fade-in zoom-in duration-150">
                       <p className="text-xs font-black text-indigo-900 uppercase flex items-center">
                         <GraduationCap className="w-4 h-4 mr-1.5 text-indigo-600" />
                         ⚙️ Paramètres Salariaux de l'Enseignant
