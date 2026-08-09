@@ -20,6 +20,21 @@ const QUICK_QUESTIONS = [
 
 export default function AIAssistant() {
   const { userProfile } = (useOutletContext<any>() || {}) as any;
+
+  if (userProfile && !['ADMIN', 'DIRECTION'].includes(userProfile.role)) {
+    return (
+      <div className="p-12 text-center bg-white rounded-2xl shadow-sm border border-slate-100 max-w-md mx-auto my-12">
+        <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-black">
+          🚫
+        </div>
+        <h3 className="font-extrabold text-slate-900 text-lg mb-2">Accès Restreint</h3>
+        <p className="text-slate-500 text-sm font-medium">
+          L'accès et l'utilisation de l'Assistant IA Grok sont strictement réservés à l'administration de l'établissement.
+        </p>
+      </div>
+    );
+  }
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',

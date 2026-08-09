@@ -299,6 +299,12 @@ class GrokAIAssistantView(APIView):
 
     def post(self, request):
         user = request.user
+        if user.role not in ['ADMIN', 'DIRECTION']:
+            return Response(
+                {"detail": "Accès refusé. L'utilisation de l'Assistant IA Grok est réservée exclusivement à l'administration de l'établissement."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         school = user.school or School.objects.first()
         prompt = request.data.get('prompt', '').strip()
 

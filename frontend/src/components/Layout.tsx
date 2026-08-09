@@ -151,10 +151,12 @@ export default function Layout() {
             </Link>
           )}
 
-          <Link to="/ai-assistant" className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/ai-assistant') ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-            <Sparkles className="w-5 h-5 mr-3 text-amber-300 animate-pulse" />
-            Assistant IA Grok
-          </Link>
+          {['ADMIN', 'DIRECTION'].includes(role) && (
+            <Link to="/ai-assistant" className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/ai-assistant') ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+              <Sparkles className="w-5 h-5 mr-3 text-amber-300 animate-pulse" />
+              Assistant IA Grok
+            </Link>
+          )}
           
           <Link to="/timetable" className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/timetable') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
             <CalendarIcon className="w-5 h-5 mr-3" />
