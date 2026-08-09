@@ -611,19 +611,35 @@ class GrokAIAssistantView(APIView):
                 "3. **Pédagogie :** Maintenir la présence au-dessus du seuil de 90% sur toutes les classes."
             )
 
-        # 6. Question générale par défaut
+        # 6. Élèves, Classes & Effectifs
+        elif any(w in prompt_lower for w in ["élève", "eleve", "étudiant", "etudiant", "classe", "effectif", "inscription", "inscrit"]):
+            reply = (
+                f"### 👨‍🎓 Effectifs & Organisation Pédagogique - {context_data['nom_etablissement']}\n\n"
+                f"• **Total élèves inscrits (actifs) :** `{total_students}` élèves\n"
+                f"• **Nombre total de classes ouvertes :** `{total_classes}` classes\n"
+                f"• **Classe la plus fréquentée :** `{top_class_name}`\n"
+                f"• **Nombre d'enseignants :** `{total_teachers}` enseignants\n\n"
+                "💡 **Action Conseillée :** Rendez-vous dans le menu **Élèves & Inscriptions** pour consulter la liste complète et éditer les cartes scolaires."
+            )
+
+        # 7. Question générale par défaut avec résumé réel complet
         else:
             reply = (
-                f"### 🤖 Synthèse Générale - {context_data['nom_etablissement']}\n\n"
-                f"• **Élèves inscrits :** `{total_students}` | **Enseignants :** `{total_teachers}` | **Classes :** `{total_classes}`\n"
-                f"• **Recettes encaissees :** `{recettes_totales:,.0f} FCFA` | **Dépenses :** `{depenses_totales:,.0f} FCFA`\n"
-                f"• **Résultat Net (Bénéfice) :** `{net_balance:,.0f} FCFA`\n"
-                f"• **Taux de Présence Semaine :** `{week_presence_rate}%`\n\n"
-                "💡 **Vous pouvez me demander :**\n"
-                "• *« Compare le mois actuel au mois dernier »*\n"
+                f"### 🤖 Synthèse Globale & Données Réelles - {context_data['nom_etablissement']}\n\n"
+                f"Voici les métriques exactes calculées en direct depuis votre base de données PostgreSQL :\n\n"
+                f"• **Élèves Inscrits :** `{total_students}` | **Enseignants :** `{total_teachers}` | **Classes :** `{total_classes}`\n"
+                f"• **Classe la plus fréquentée :** `{top_class_name}`\n"
+                f"• **Recettes Encaissées :** `{recettes_totales:,.0f} FCFA` (Ce mois: `{recettes_mois_actuel:,.0f} FCFA`)\n"
+                f"• **Dépenses d'Exploitation :** `{depenses_totales:,.0f} FCFA` (Ce mois: `{depenses_mois_actuel:,.0f} FCFA`)\n"
+                f"• **Poste de Dépense Majeur :** `{top_expense_cat_name}`\n"
+                f"• **Bénéfice Net d'Exploitation :** `{net_balance:,.0f} FCFA`\n"
+                f"• **Impayés à Recouvrer :** `{unpaid_sum:,.0f} FCFA` ({unpaid_count} échéances)\n"
+                f"• **Taux de Présence Hebdomadaire :** `{week_presence_rate}%`\n\n"
+                "💡 **Questions suggérées pour des rapports détaillés :**\n"
+                "• *« Donne-moi le comparatif financier mensuel »*\n"
                 "• *« Quels sont les élèves qui n'ont pas encore payé ? »*\n"
-                "• *« Combien d'heures cet enseignant a travaillées et calcule son salaire »*\n"
-                "• *« Quel est le taux de présence et quelle classe a le plus d'absences ? »*\n"
+                "• *« Décompte des salaires et heures des enseignants »*\n"
+                "• *« Quel est le taux de présence et la classe la plus absente ? »*\n"
                 "• *« Prépare-moi le rapport annuel complet de l'établissement »*"
             )
 
