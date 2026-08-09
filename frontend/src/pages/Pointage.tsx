@@ -197,6 +197,7 @@ export default function Pointage() {
             </Button>
           )}
         </div>
+      </div>
       {/* Bannière Calculateur Automatique du Taux Horaire pour Enseignants */}
       {isTeacher && (
         <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl">
