@@ -212,10 +212,20 @@ export default function Users() {
                     onChange={(e) => setFormData({...formData, role: e.target.value})}
                   >
                     <option value="ELEVE">Élève</option>
-                    <option value="ENSEIGNANT">Enseignant</option>
+                    <option value="ENSEIGNANT">Enseignant (Professeur)</option>
                     <option value="PARENT">Parent</option>
                     <option value="DIRECTION">Direction / Admin École</option>
                   </select>
+
+                  {formData.role === 'ENSEIGNANT' ? (
+                    <p className="text-[11px] font-bold text-blue-600 mt-1.5 flex items-center">
+                      ✨ Le formulaire inclut les champs Taux Horaire, Primes &amp; Cotisations ci-dessous.
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 mt-1 italic">
+                      💡 Sélectionnez <strong>Enseignant</strong> pour définir un Taux Horaire (ex: 2000 F/h), Salaire et Cotisations.
+                    </p>
+                  )}
                 </div>
                 
                 <div>
@@ -470,11 +480,27 @@ export default function Users() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                         <div className="text-xs text-slate-700 font-bold">{familyLabel}</div>
-                         {isParent && user.children?.length > 0 && (
-                            <div className="text-[9px] text-slate-400 truncate max-w-[150px]">
-                               IDs: {user.children.join(', ')}
+                         {user.role === 'ENSEIGNANT' ? (
+                            <div className="space-y-0.5">
+                               <div className="text-xs font-black text-indigo-600">
+                                  ⏱️ Taux : {parseFloat(user.hourly_rate || 0).toLocaleString()} F/h
+                               </div>
+                               <div className="text-[10px] text-slate-600 font-bold">
+                                  Base Fixe : {parseFloat(user.base_salary || 0).toLocaleString()} F
+                               </div>
+                               <div className="text-[9px] font-semibold text-slate-500">
+                                  <span className="text-emerald-600">+{parseFloat(user.allowances || 0).toLocaleString()} F Primes</span> | <span className="text-rose-600">-{parseFloat(user.deductions || 0).toLocaleString()} F Cotisations</span>
+                               </div>
                             </div>
+                         ) : (
+                            <>
+                               <div className="text-xs text-slate-700 font-bold">{familyLabel}</div>
+                               {isParent && user.children?.length > 0 && (
+                                  <div className="text-[9px] text-slate-400 truncate max-w-[150px]">
+                                     IDs: {user.children.join(', ')}
+                                  </div>
+                               )}
+                            </>
                          )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -491,12 +517,12 @@ export default function Users() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 font-medium">
                         {user.phone_number || "---"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                         <button 
                           onClick={() => openEditModal(user)}
                           className="text-blue-600 hover:text-blue-900 font-bold hover:underline"
                         >
-                          Éditer
+                          {user.role === 'ENSEIGNANT' ? "⚙️ Assigner Taux & Editer" : "Éditer"}
                         </button>
                       </td>
                     </tr>
