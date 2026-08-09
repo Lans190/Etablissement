@@ -1239,6 +1239,8 @@ export default function Finance() {
                </form>
             </div>
          </div>
+      )}
+
       {/* Modal Modification Taux Horaire & Salaire Enseignant */}
       {showRateModal && selectedTeacherForRate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
