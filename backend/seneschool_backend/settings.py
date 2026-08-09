@@ -1,6 +1,5 @@
 import os
 import environ
-import dj_database_url
 from pathlib import Path
 from datetime import timedelta
 
@@ -74,20 +73,11 @@ TEMPLATES = [
 WSGI_APPLICATION = 'seneschool_backend.wsgi.application'
 
 # Database
-# Utilise DATABASE_URL si disponible, sinon utilise les variables individuelles
-DATABASE_URL = env('DATABASE_URL', default=None)
-
-if DATABASE_URL:
-    # Configuration pour Render avec PostgreSQL
+if env('DATABASE_URL', default=None):
     DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600,
-            ssl_require=True  # Important pour Render
-        )
+        'default': env.db()
     }
 else:
-    # Configuration pour le développement local
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -132,7 +122,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS
-CORS_ALLOW_ALL_ORIGINS = True  # Change in production!
+CORS_ALLOW_ALL_ORIGINS = True # Change in production!
 
 # Django REST Framework
 REST_FRAMEWORK = {
@@ -156,3 +146,7 @@ SIMPLE_JWT = {
 # Celery / Redis config
 CELERY_BROKER_URL = env('REDIS_URL', default='redis://127.0.0.1:6379/0')
 CELERY_RESULT_BACKEND = env('REDIS_URL', default='redis://127.0.0.1:6379/0')
+
+# Grok / xAI API Key
+GROK_API_KEY = env('GROK_API_KEY', default=env('XAI_API_KEY', default=''))
+

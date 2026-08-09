@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from .models import FeeType, FeeAllocation, Payment
 from .serializers import FeeTypeSerializer, FeeAllocationSerializer, PaymentSerializer
+from core.models import School
+
 
 class FinancePermission(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -121,8 +123,149 @@ class IncomeViewSet(viewsets.ModelViewSet):
     permission_classes = [FinancePermission]
 
     def get_queryset(self):
-        return Income.objects.filter(school=self.request.user.school).order_by('-date')
+        school = self.request.user.school or School.objects.first()
+        return Income.objects.filter(school=school).order_by('-date')
 
     def perform_create(self, serializer):
-        serializer.save(school=self.request.user.school)
+        school = self.request.user.school or School.objects.first()
+        serializer.save(school=school)
+
+
+from .models import Payslip
+from .serializers import PayslipSerializer
+
+class PayslipViewSet(viewsets.ModelViewSet):
+    serializer_class = PayslipSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        school = user.school or School.objects.first()
+        if user.role == 'ENSEIGNANT':
+            return Payslip.objects.filter(teacher=user).order_by('-year', '-month')
+        if school:
+            return Payslip.objects.filter(school=school).order_by('-year', '-month')
+        return Payslip.objects.none()
+
+    def perform_create(self, serializer):
+        school = self.request.user.school or School.objects.first()
+        serializer.save(school=school)
+
+    @action(detail=False, methods=['post'])
+    def generate_monthly(self, request):
+        if request.user.role not in ['ADMIN', 'DIRECTION', 'COMPTABLE']:
+            return Response({'detail': 'Permission refusée.'}, status=status.HTTP_403_FORBIDDEN)
+
+        month = request.data.get('month')
+        year = request.data.get('year')
+
+        try:
+            month = int(month)
+            year = int(year)
+        except (TypeError, ValueError):
+            from django.utils import timezone
+            now = timezone.now()
+            month = now.month
+            year = now.year
+
+        school = request.user.school or School.objects.first()
+        if not school:
+            return Response({"error": "Aucun établissement trouvé"}, status=400)
+
+        from django.contrib.auth import get_user_model
+        from academics.models import TeachingPointage
+        from django.db.models import Sum
+
+        User = get_user_model()
+        teachers = User.objects.filter(school=school, role='ENSEIGNANT')
+
+        created_count = 0
+        for teacher in teachers:
+            # Calculer les heures validées du mois
+            hours_sum = TeachingPointage.objects.filter(
+                teacher=teacher,
+                date__month=month,
+                date__year=year,
+                status='VALIDATED'
+            ).aggregate(total=Sum('hours_count'))['total'] or 0
+
+            hourly_rate = float(teacher.hourly_rate or 0)
+            base_sal = float(teacher.base_salary or 0)
+
+            payslip, created = Payslip.objects.get_or_create(
+                school=school,
+                teacher=teacher,
+                month=month,
+                year=year,
+                defaults={
+                    'hours_worked': float(hours_sum),
+                    'hourly_rate': hourly_rate,
+                    'base_salary': base_sal,
+                    'is_paid': False
+                }
+            )
+
+            if not created:
+                payslip.hours_worked = float(hours_sum)
+                payslip.hourly_rate = hourly_rate
+                payslip.base_salary = base_sal
+                payslip.save()
+
+            created_count += 1
+
+            # Notification pour l'enseignant
+            try:
+                from core.views import create_notification
+                create_notification(
+                    school=school,
+                    title=f"Fiche de paie disponible ({month}/{year})",
+                    message=f"Votre fiche de paie pour {month}/{year} a été générée ({payslip.net_salary} FCFA).",
+                    type="FINANCE",
+                    user=teacher
+                )
+            except Exception:
+                pass
+
+        return Response({
+            "message": f"{created_count} fiches de paie générées/actualisées avec succès pour {month}/{year}.",
+            "month": month,
+            "year": year
+        })
+
+    @action(detail=True, methods=['get'])
+    def pdf(self, request, pk=None):
+        payslip = self.get_object()
+        from .utils import generate_payslip_pdf
+        pdf_bytes = generate_payslip_pdf(payslip)
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="bulletin_paie_{payslip.teacher.last_name}_{payslip.month}_{payslip.year}.pdf"'
+        return response
+
+    @action(detail=False, methods=['get'])
+    def export_payroll_journal_pdf(self, request):
+        if request.user.role not in ['ADMIN', 'DIRECTION', 'COMPTABLE']:
+            return Response({'detail': 'Permission refusée.'}, status=status.HTTP_403_FORBIDDEN)
+
+        month = request.query_params.get('month')
+        year = request.query_params.get('year')
+
+        try:
+            month = int(month)
+            year = int(year)
+        except (TypeError, ValueError):
+            from django.utils import timezone
+            now = timezone.now()
+            month = now.month
+            year = now.year
+
+        school = request.user.school or School.objects.first()
+        queryset = self.get_queryset().filter(month=month, year=year)
+
+        from .utils import generate_payroll_journal_pdf
+        pdf_bytes = generate_payroll_journal_pdf(queryset, month, year, school)
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="journal_de_paie_{month}_{year}.pdf"'
+        return response
+
+
 

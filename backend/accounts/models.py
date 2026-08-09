@@ -38,5 +38,11 @@ class CustomUser(AbstractUser):
     # Lien Parent -> Élève(s)
     children = models.ManyToManyField('self', symmetrical=False, related_name='parents', blank=True, limit_choices_to={'role': 'ELEVE'}, verbose_name=_("Enfants (Élèves)"))
 
+    # RH et Rémunération
+    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_("Taux horaire (FCFA/h)"))
+    base_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name=_("Salaire de base (FCFA)"))
+
     def __str__(self):
         return f"{self.get_full_name()} ({self.get_role_display()})"
+
+

@@ -125,6 +125,20 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 if parent.phone_number:
                     SMSService.send_sms(school, parent.phone_number, message)
 
+        try:
+            from core.views import create_notification
+            school = attendance.enrollment.classroom.cycle.school or self.request.user.school
+            if attendance.status in ['ABSENT', 'LATE']:
+                create_notification(
+                    school=school,
+                    title=f"Absence / Retard enregistré",
+                    message=f"Élève {student.get_full_name()} marqué {attendance.get_status_display().lower()} ({attendance.enrollment.classroom.name}) le {attendance.date}.",
+                    type="ABSENCE"
+                )
+        except Exception:
+            pass
+
+
     def get_queryset(self):
         user = self.request.user
         if not user.is_authenticated:

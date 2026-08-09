@@ -103,8 +103,13 @@ class CurrentUserView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        serializer = UserSerializer(request.user, context={'request': request})
+        user = request.user
+        if not user.school and School.objects.exists():
+            user.school = School.objects.first()
+            user.save(update_fields=['school'])
+        serializer = UserSerializer(user, context={'request': request})
         return Response(serializer.data)
+
 
 class RegisterSchoolView(APIView):
     permission_classes = [permissions.AllowAny]

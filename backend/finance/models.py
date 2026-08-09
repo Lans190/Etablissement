@@ -93,3 +93,39 @@ class Income(models.Model):
         verbose_name_plural = _("Recettes")
         ordering = ['-date']
 
+
+class Payslip(models.Model):
+    """Fiche de paie de l'enseignant"""
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='payslips', verbose_name=_("Établissement"))
+    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payslips', limit_choices_to={'role': 'ENSEIGNANT'}, verbose_name=_("Enseignant"))
+    month = models.PositiveIntegerField(verbose_name=_("Mois (1-12)"))
+    year = models.PositiveIntegerField(verbose_name=_("Année"))
+    hours_worked = models.FloatField(default=0, verbose_name=_("Heures validées"))
+    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_("Taux horaire (FCFA/h)"))
+    base_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name=_("Salaire fixe de base"))
+    bonus = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_("Primes (FCFA)"))
+    deductions = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_("Retenues (FCFA)"))
+    advances = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_("Avances / Acomptes (FCFA)"))
+    overtime_pay = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_("Heures supplémentaires (FCFA)"))
+    net_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name=_("Salaire Net (FCFA)"))
+    is_paid = models.BooleanField(default=False, verbose_name=_("Statut du Paiement"))
+    payment_date = models.DateField(blank=True, null=True, verbose_name=_("Date de paiement"))
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        calculated_hours_pay = float(self.hours_worked) * float(self.hourly_rate)
+        self.net_salary = calculated_hours_pay + float(self.base_salary) + float(self.bonus) + float(self.overtime_pay) - float(self.deductions) - float(self.advances)
+        if self.net_salary < 0:
+            self.net_salary = 0
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Fiche de paie {self.month}/{self.year} - {self.teacher.get_full_name()} ({self.net_salary} FCFA)"
+
+    class Meta:
+        verbose_name = _("Fiche de Paie")
+        verbose_name_plural = _("Fiches de Paie")
+        ordering = ['-year', '-month']
+        unique_together = ('teacher', 'month', 'year')
+
+

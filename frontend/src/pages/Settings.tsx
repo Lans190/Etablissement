@@ -1,17 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
 import api from '@/api/axios';
 import { Settings as SettingsIcon, Save, Camera, Loader2, MapPin, Phone, Mail, Building, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function Settings() {
-  const { setUserProfile } = useOutletContext<any>() || {};
   const [activeSubTab, setActiveSubTab] = useState<'profile' | 'classes' | 'subjects' | 'allocations' | 'timeslots'>('profile');
   const [school, setSchool] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
-
 
   // Core configurations
   const [subjects, setSubjects] = useState([]);
@@ -160,9 +157,6 @@ export default function Settings() {
         school_email: response.data.email,
       };
       localStorage.setItem('user_profile', JSON.stringify(updatedProfile));
-      if (setUserProfile) {
-        setUserProfile(updatedProfile);
-      }
       alert("Paramètres mis à jour !");
     } catch (error) {
       alert("Erreur lors de la sauvegarde.");

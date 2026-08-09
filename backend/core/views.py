@@ -1,6 +1,8 @@
 from rest_framework import viewsets, permissions
-from .models import School, Cycle, AcademicYear, ClassRoom, SchoolEvent
-from .serializers import SchoolSerializer, CycleSerializer, AcademicYearSerializer, ClassRoomSerializer, SchoolEventSerializer
+from rest_framework.decorators import action
+from .models import School, Cycle, AcademicYear, ClassRoom
+from .serializers import SchoolSerializer, CycleSerializer, AcademicYearSerializer, ClassRoomSerializer
+
 
 class IsAdminOrReadOnly(permissions.BasePermission):
     """
@@ -54,22 +56,6 @@ class ClassRoomViewSet(viewsets.ModelViewSet):
             return ClassRoom.objects.filter(cycle__school=user.school)
         return ClassRoom.objects.all()
 
-class SchoolEventViewSet(viewsets.ModelViewSet):
-    serializer_class = SchoolEventSerializer
-    permission_classes = [IsAdminOrReadOnly]
-
-    def get_queryset(self):
-        user = self.request.user
-        if not user.is_authenticated:
-            return SchoolEvent.objects.none()
-        if user.school:
-            return SchoolEvent.objects.filter(school=user.school)
-        return SchoolEvent.objects.all()
-
-    def perform_create(self, serializer):
-        serializer.save(school=self.request.user.school)
-
-
 from .models import SMSLog
 from .serializers import SMSLogSerializer
 from .sms_service import SMSService
@@ -107,6 +93,34 @@ class SendBulkSMSView(APIView):
         results = SMSService.send_bulk_sms(school, recipients, message)
         return Response({"status": "success", "sent_count": len(results)})
 
+from .models import SchoolEvent
+from .serializers import SchoolEventSerializer
+
+class SchoolEventViewSet(viewsets.ModelViewSet):
+    serializer_class = SchoolEventSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return SchoolEvent.objects.none()
+        qs = SchoolEvent.objects.all()
+        if user.school:
+            qs = qs.filter(school=user.school)
+        # Filtre optionnel par mois/année
+        month = self.request.query_params.get('month')
+        year  = self.request.query_params.get('year')
+        if year:
+            qs = qs.filter(start_date__year=year)
+        if month:
+            qs = qs.filter(start_date__month=month)
+        return qs.order_by('start_date')
+
+    def perform_create(self, serializer):
+        serializer.save(school=self.request.user.school, created_by=self.request.user)
+
+
+
 from django.db.models import Sum, Count, Avg, Q
 from students.models import Enrollment
 from finance.models import Payment
@@ -117,10 +131,10 @@ class DashboardStatsView(APIView):
 
     def get(self, request):
         user = request.user
-        school = user.school
+        school = user.school or School.objects.first()
         
         if not school:
-            return Response({"error": "No school found"}, status=400)
+            return Response({"error": "Aucun établissement configuré"}, status=400)
 
         from django.contrib.auth import get_user_model
         from django.utils import timezone
@@ -237,133 +251,205 @@ class DashboardStatsView(APIView):
         })
 
 
-class GrokAnalysisView(APIView):
+from .models import Notification
+from .serializers import NotificationSerializer
+
+def create_notification(school, title, message, type='INFO', user=None):
+    """Fonction utilitaire globale pour générer des notifications dans le système"""
+    if not school:
+        school = School.objects.first()
+    if school:
+        Notification.objects.create(
+            school=school,
+            title=title,
+            message=message,
+            type=type,
+            user=user
+        )
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request):
-        import os
-        import json
-        import requests
-        
-        user = request.user
-        school = user.school
+    def get_queryset(self):
+        user = self.request.user
+        school = user.school or School.objects.first()
         if not school:
-            return Response({"error": "No school found"}, status=400)
+            return Notification.objects.none()
+        
+        # Filtre par école et par utilisateur si spécifié ou global
+        qs = Notification.objects.filter(school=school)
+        if user.role not in ['ADMIN', 'DIRECTION']:
+            qs = qs.filter(Q(user=user) | Q(user__isnull=True))
+        return qs.order_by('-created_at')
 
+    @action(detail=False, methods=['post'])
+    def mark_all_as_read(self, request):
+        qs = self.get_queryset().filter(is_read=False)
+        qs.update(is_read=True)
+        return Response({"status": "success", "marked_count": qs.count()})
+
+
+import json
+import urllib.request
+import os
+
+class GrokAIAssistantView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        school = user.school or School.objects.first()
+        prompt = request.data.get('prompt', '').strip()
+
+        if not prompt:
+            return Response({"error": "Veuillez poser une question à l'assistant IA."}, status=400)
+
+        # 1. Extraction en direct des métriques de PostgreSQL
         from django.contrib.auth import get_user_model
-        from django.utils import timezone
-        from datetime import date as dt_date
-        User = get_user_model()
-        from finance.models import Payment, Expense, FeeAllocation
-        from students.models import Attendance
+        from students.models import Enrollment, Attendance
+        from finance.models import Payment, Expense, FeeAllocation, Payslip
+        from academics.models import TeachingPointage, SubjectAllocation
 
+        User = get_user_model()
         today = dt_date.today()
 
-        # Gather data
         total_students = Enrollment.objects.filter(classroom__cycle__school=school, is_active=True).count()
         total_teachers = User.objects.filter(school=school, role='ENSEIGNANT').count()
         total_classes = ClassRoom.objects.filter(cycle__school=school).count()
-        
-        total_revenue = Payment.objects.filter(
+
+        total_recettes = Payment.objects.filter(
             fee_allocation__enrollment__classroom__cycle__school=school
         ).aggregate(total=Sum('amount_paid'))['total'] or 0
-        total_expenses = Expense.objects.filter(school=school).aggregate(total=Sum('amount'))['total'] or 0
-        balance = total_revenue - total_expenses
-        
-        unpaid_fees_count = FeeAllocation.objects.filter(
+
+        total_depenses = Expense.objects.filter(school=school).aggregate(total=Sum('amount'))['total'] or 0
+        net_balance = total_recettes - total_depenses
+
+        unpaid_count = FeeAllocation.objects.filter(
             enrollment__classroom__cycle__school=school,
             is_paid=False
         ).count()
 
-        total_absences = Attendance.objects.filter(
+        unpaid_sum = FeeAllocation.objects.filter(
+            enrollment__classroom__cycle__school=school,
+            is_paid=False
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        today_absences = Attendance.objects.filter(
             enrollment__classroom__cycle__school=school,
             date=today,
             status='ABSENT'
         ).count()
 
-        total_recorded_absences = Attendance.objects.filter(
-            enrollment__classroom__cycle__school=school,
-            status='ABSENT'
-        ).count()
+        top_teachers = TeachingPointage.objects.filter(
+            classroom__cycle__school=school,
+            status='VALIDATED'
+        ).values('teacher__first_name', 'teacher__last_name').annotate(total_h=Sum('hours_count')).order_by('-total_h')[:5]
 
-        # Build context
-        data_summary = {
-            "nom_ecole": school.name,
-            "adresse": school.address or "Non spécifiée",
+        teacher_hours_summary = [f"{t['teacher__first_name']} {t['teacher__last_name']}: {t['total_h']}h" for t in top_teachers]
+
+        context_data = {
+            "nom_etablissement": school.name if school else "Établissement",
             "effectif_eleves": total_students,
-            "nombre_enseignants": total_teachers,
-            "nombre_classes": total_classes,
-            "finance": {
-                "recettes_totales_fcfa": float(total_revenue),
-                "depenses_totales_fcfa": float(total_expenses),
-                "solde_fcfa": float(balance),
-                "allocations_frais_impayes": unpaid_fees_count
-            },
-            "assiduite": {
-                "nombre_absences_aujourd_hui": total_absences,
-                "nombre_total_absences_enregistrees": total_recorded_absences
-            }
+            "effectif_enseignants": total_teachers,
+            "total_classes": total_classes,
+            "recettes_totales_fcfa": float(total_recettes),
+            "depenses_totales_fcfa": float(total_depenses),
+            "benefice_net_fcfa": float(net_balance),
+            "frais_impayes_nombre": unpaid_count,
+            "montant_impayes_estime_fcfa": float(unpaid_sum),
+            "absences_aujourdhui": today_absences,
+            "top_enseignants_heures": teacher_hours_summary,
+            "date_du_jour": str(today)
         }
 
-        # Check API Key
-        api_key = os.environ.get('GROK_API_KEY') or os.environ.get('XAI_API_KEY')
-        prompt = f"""
-        En tant qu'assistant IA spécialisé dans l'analyse de gestion d'établissements scolaires (SeneSchool AI), analyse les données suivantes pour l'école "{school.name}" et génère un rapport d'analyse stratégique concis contenant :
-        1. Diagnostic général (Forces et faiblesses basées sur les chiffres)
-        2. Analyse financière (Santé de la trésorerie et recouvrement des frais)
-        3. Analyse de l'assiduité (Diagnostic sur l'absentéisme des élèves)
-        4. Recommandations concrètes (Actions prioritaires à mener).
-        
-        Données :
-        {json.dumps(data_summary, indent=2)}
-        
-        Réponds en français avec un ton professionnel, encourageant et structuré en Markdown.
-        """
+        system_instruction = (
+            f"Vous êtes Grok, l'Assistant IA officiel d'analyse de données pour l'établissement scolaire {context_data['nom_etablissement']}.\n"
+            "Vous répondez exclusivement sur la base des données réelles ci-dessous extraites directement de PostgreSQL.\n"
+            "Soyez précis, professionnel, avec un ton structuré et constructif (utilisez le symbole FCFA, des puces de texte, des tableaux en Markdown si pertinent).\n"
+            "Ne réinventez pas les chiffres. Si une donnée n'est pas disponible, indiquez-le clairement.\n\n"
+            f"DONNÉES EN TEMPS RÉEL DE L'ÉTABLISSEMENT:\n{json.dumps(context_data, ensure_ascii=False, indent=2)}\n"
+        )
 
-        if api_key:
-            try:
-                headers = {
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "model": "grok-beta",
-                    "messages": [
-                        {"role": "system", "content": "Tu es un expert en audit scolaire et conseiller de direction pour SeneSchool."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.7
-                }
-                api_res = requests.post("https://api.x.ai/v1/chat/completions", headers=headers, json=payload, timeout=15)
-                if api_res.status_code == 200:
-                    ai_content = api_res.json()['choices'][0]['message']['content']
-                    return Response({"analysis": ai_content, "provider": "Grok AI"})
-            except Exception as e:
-                pass
+        from django.conf import settings
+        grok_api_key = (
+            os.getenv("GROK_API_KEY")
+            or os.getenv("XAI_API_KEY")
+            or getattr(settings, 'GROK_API_KEY', '')
+        )
 
-        # Mock Analysis Fallback if no key or API failed
-        mock_analysis = f"""### 📊 Analyse Stratégique pour {school.name}
+        if grok_api_key and grok_api_key.strip():
+            clean_key = grok_api_key.strip()
+            models_to_try = ["grok-2-latest", "grok-beta", "grok-2"]
+            
+            for model_name in models_to_try:
+                try:
+                    payload = {
+                        "model": model_name,
+                        "messages": [
+                            {"role": "system", "content": system_instruction},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.3
+                    }
+                    headers = {
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {clean_key}"
+                    }
+                    req = urllib.request.Request(
+                        "https://api.x.ai/v1/chat/completions",
+                        data=json.dumps(payload).encode('utf-8'),
+                        headers=headers,
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=20) as resp:
+                        resp_data = json.loads(resp.read().decode('utf-8'))
+                        ai_reply = resp_data['choices'][0]['message']['content']
+                        return Response({
+                            "answer": ai_reply,
+                            "context": context_data,
+                            "source": f"API Grok xAI ({model_name})"
+                        })
+                except Exception:
+                    continue
 
-*Généré par SeneSchool AI (Simulateur d'Audit)*
+        # Fallback intelligent basé sur les règles métier si la clé API n'est pas encore saisie
+        prompt_lower = prompt.lower()
+        if "recette" in prompt_lower or "revenu" in prompt_lower or "finan" in prompt_lower or "bénéfice" in prompt_lower or "depense" in prompt_lower or "bilan" in prompt_lower:
+            reply = (
+                f"### 📊 Rapport Financier - {context_data['nom_etablissement']}\n\n"
+                f"- **Recettes Totales Encaissees :** `{context_data['recettes_totales_fcfa']:,.0f} FCFA`\n"
+                f"- **Dépenses Totales :** `{context_data['depenses_totales_fcfa']:,.0f} FCFA`\n"
+                f"- **Résultat Net / Bénéfice :** `{context_data['benefice_net_fcfa']:,.0f} FCFA`\n"
+                f"- **Montant Reste à Encaisser (Impayés) :** `{context_data['montant_impayes_estime_fcfa']:,.0f} FCFA` ({context_data['frais_impayes_nombre']} échéances)\n\n"
+                "💡 **Recommandation :** Relancer en priorité les parents ayant des échéances impayées pour optimiser la trésorerie mensuelle."
+            )
+        elif "enseignant" in prompt_lower or "prof" in prompt_lower or "heure" in prompt_lower or "salaire" in prompt_lower:
+            teachers_str = "\n".join([f"- {t}" for t in teacher_hours_summary]) if teacher_hours_summary else "- Aucun pointage validé enregistré."
+            reply = (
+                f"### 👨‍🏫 Analyse Ressources Humaines & Enseignants\n\n"
+                f"- **Nombre total d'enseignants :** `{total_teachers}`\n"
+                f"- **Volume d'heures validées par enseignant :**\n{teachers_str}\n\n"
+                "💡 **Calcul Automatique :** Le salaire des enseignants est calculé sur la formule `Taux Horaire × Heures Validées + Salaire de Base + Primes - Retenues`."
+            )
+        elif "élève" in prompt_lower or "eleve" in prompt_lower or "inscrit" in prompt_lower or "classe" in prompt_lower:
+            reply = (
+                f"### 🎓 Synthèse des Effectifs Scolaires\n\n"
+                f"- **Total Élèves Inscrits :** `{total_students}`\n"
+                f"- **Nombre de Classes Ouvertes :** `{total_classes}`\n"
+                f"- **Absences Aujourd'hui ({today}) :** `{today_absences} élève(s)`\n"
+            )
+        else:
+            reply = (
+                f"### 🤖 Synthèse Générale - {context_data['nom_etablissement']}\n\n"
+                f"- **Élèves inscrits :** `{total_students}` | **Classes :** `{total_classes}`\n"
+                f"- **Enseignants :** `{total_teachers}`\n"
+                f"- **Recettes encaissees :** `{total_recettes:,.0f} FCFA` | **Dépenses :** `{total_depenses:,.0f} FCFA`\n"
+                f"- **Balance Financière :** `{net_balance:,.0f} FCFA`\n"
+                f"- **Échéances impayées :** `{unpaid_count}` (`{unpaid_sum:,.0f} FCFA`)\n\n"
+                "Tapez une question spécifique pour obtenir un rapport approfondi sur les finances, les présences ou les fiches de paie."
+            )
 
-#### 1. Diagnostic Général
-- **Forces** : L'établissement compte un effectif de **{total_students} élèves** encadrés par **{total_teachers} enseignants** répartis sur **{total_classes} classes**. Le ratio élèves/enseignant est optimal pour un suivi pédagogique de qualité.
-- **Points de vigilance** : Assurer une bonne répartition des charges de cours et suivre les pointages réguliers des enseignants pour maximiser le temps d'apprentissage.
-
-#### 2. Analyse Financière
-- **Trésorerie** : Les recettes totales s'élèvent à **{total_revenue:,.0f} FCFA** contre des dépenses de **{total_expenses:,.0f} FCFA**, ce qui dégage un solde de **{balance:,.0f} FCFA**.
-- **Recouvrement** : Il y a actuellement **{unpaid_fees_count} mensualités ou frais en attente de paiement**. Cela représente un risque pour la trésorerie.
-- *Recommandation* : Mettre en place un plan de relance automatique par SMS via notre module de communication pour les parents ayant des arriérés.
-
-#### 3. Analyse de l'Assiduité
-- **Absentéisme** : Un total de **{total_absences} absences** a été enregistré aujourd'hui, avec un historique cumulé de **{total_recorded_absences} absences**.
-- *Recommandation* : Automatiser la validation administrative des absences quotidiennes pour maintenir une rigueur et envoyer des alertes immédiates aux tuteurs.
-
-#### 4. Recommandations Prioritaires
-1. **Campagne de Recouvrement** : Relancer les parents pour les **{unpaid_fees_count} frais impayés** avant la fin de la période d'examens.
-2. **Suivi des pointages** : Valider les heures de cours en attente pour garantir le paiement juste des heures supplémentaires des enseignants.
-3. **Conseil pédagogique** : Organiser une réunion de coordination pour consolider le taux d'assiduité au-delà de 95%.
-"""
-        return Response({"analysis": mock_analysis, "provider": "SeneSchool Mock Engine"})
+        return Response({"answer": reply, "context": context_data, "source": "Base de Données PostgreSQL"})
 
 

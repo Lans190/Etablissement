@@ -133,29 +133,58 @@ class SMSLog(models.Model):
         verbose_name = _("Log SMS")
         verbose_name_plural = _("Logs SMS")
 
-
 class SchoolEvent(models.Model):
-    class EventTypeChoices(models.TextChoices):
-        EXAM = 'EXAM', _('Examen')
-        VACATION = 'VACATION', _('Vacances')
-        REUNION = 'REUNION', _('Réunion')
-        HOLIDAY = 'HOLIDAY', _('Jour Férié')
-        ACTIVITY = 'ACTIVITY', _('Activité Scolaire')
+    class EventType(models.TextChoices):
+        EXAM     = 'EXAM',     _('Examen / Évaluation')
+        VACATION = 'VACATION', _('Vacances scolaires')
+        HOLIDAY  = 'HOLIDAY',  _('Jour férié')
+        REUNION  = 'REUNION',  _('Réunion')
+        ACTIVITY = 'ACTIVITY', _('Activité scolaire')
+        CONSEIL  = 'CONSEIL',  _('Conseil de classe')
+        PARENTS  = 'PARENTS',  _('Réunion parents-professeurs')
+        OTHER    = 'OTHER',    _('Autre')
 
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='events', verbose_name=_("Établissement"))
-    title = models.CharField(max_length=200, verbose_name=_("Titre"))
-    event_type = models.CharField(max_length=20, choices=EventTypeChoices.choices, default=EventTypeChoices.ACTIVITY, verbose_name=_("Type d'événement"))
-    start_date = models.DateField(verbose_name=_("Date de début"))
-    end_date = models.DateField(verbose_name=_("Date de fin"))
+    school      = models.ForeignKey(School, on_delete=models.CASCADE, related_name='events', verbose_name=_("Établissement"))
+    title       = models.CharField(max_length=200, verbose_name=_("Titre de l'événement"))
+    event_type  = models.CharField(max_length=20, choices=EventType.choices, default=EventType.OTHER, verbose_name=_("Type"))
+    start_date  = models.DateField(verbose_name=_("Date de début"))
+    end_date    = models.DateField(verbose_name=_("Date de fin"))
     description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
-    color = models.CharField(max_length=7, default='#3b82f6', verbose_name=_("Couleur hexadécimale"))
+    color       = models.CharField(max_length=10, default='#3b82f6', verbose_name=_("Couleur"))
+    created_by  = models.ForeignKey('accounts.CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_events')
+    created_at  = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.title} ({self.get_event_type_display()})"
+        return f"{self.title} ({self.start_date})"
 
     class Meta:
-        verbose_name = _("Événement Scolaire")
-        verbose_name_plural = _("Événements Scolaires")
+        verbose_name = _("Événement scolaire")
+        verbose_name_plural = _("Événements scolaires")
         ordering = ['start_date']
 
+
+class Notification(models.Model):
+    class NotificationType(models.TextChoices):
+        INFO = 'INFO', _('Information')
+        ATTENDANCE = 'ATTENDANCE', _('Appel / Présence')
+        POINTAGE = 'POINTAGE', _('Pointage Enseignant')
+        ABSENCE = 'ABSENCE', _('Absence Signallée')
+        FINANCE = 'FINANCE', _('Finance & Scolarité')
+        COURSE = 'COURSE', _('Cours & Attribution')
+
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='notifications', verbose_name=_("Établissement"))
+    title = models.CharField(max_length=200, verbose_name=_("Titre"))
+    message = models.TextField(verbose_name=_("Message"))
+    type = models.CharField(max_length=20, choices=NotificationType.choices, default=NotificationType.INFO, verbose_name=_("Type"))
+    user = models.ForeignKey('accounts.CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='notifications', verbose_name=_("Destinataire spécifique"))
+    is_read = models.BooleanField(default=False, verbose_name=_("Lu"))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Date de création"))
+
+    def __str__(self):
+        return f"[{self.type}] {self.title} - {self.school.name}"
+
+    class Meta:
+        verbose_name = _("Notification")
+        verbose_name_plural = _("Notifications")
+        ordering = ['-created_at']
 

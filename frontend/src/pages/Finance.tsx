@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
 import api from '@/api/axios';
-import { Wallet, Plus, Search, Loader2, FileText, ArrowUpRight, ArrowDownRight, X, ListFilter, Eye, Trash2, Tag, Calendar } from 'lucide-react';
+import { Wallet, Plus, Search, Loader2, FileText, ArrowUpRight, ArrowDownRight, X, ListFilter, Eye, Trash2, Tag, Calendar, Users, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useOutletContext } from 'react-router-dom';
 
 export default function Finance() {
-  const [activeTab, setActiveTab] = useState<'incomes' | 'expenses' | 'fee_types'>('incomes');
+  const { userProfile } = (useOutletContext<any>() || {}) as any;
+  const [activeTab, setActiveTab] = useState<'incomes' | 'expenses' | 'fee_types' | 'payroll'>('incomes');
   const [incomeSubTab, setIncomeSubTab] = useState<'school_fees' | 'other_incomes'>('school_fees');
+  const [payslips, setPayslips] = useState<any[]>([]);
+  const [payrollMonth, setPayrollMonth] = useState(new Date().getMonth() + 1);
+  const [payrollYear, setPayrollYear] = useState(new Date().getFullYear());
+  const [generatingPayroll, setGeneratingPayroll] = useState(false);
+
+
   
   const [allocations, setAllocations] = useState([]);
   const [classrooms, setClassrooms] = useState([]);
@@ -60,13 +68,14 @@ export default function Finance() {
 
   const fetchData = async () => {
     try {
-      const [allocRes, classRes, payRes, expRes, typeRes, incRes] = await Promise.all([
+      const [allocRes, classRes, payRes, expRes, typeRes, incRes, payslipRes] = await Promise.all([
         api.get('finance/allocations/'),
         api.get('core/classrooms/'),
         api.get('finance/payments/'),
         api.get('finance/expenses/'),
         api.get('finance/fee-types/'),
-        api.get('finance/incomes/')
+        api.get('finance/incomes/'),
+        api.get('finance/payslips/'),
       ]);
       setAllocations(allocRes.data);
       setClassrooms(classRes.data);
@@ -74,6 +83,7 @@ export default function Finance() {
       setExpenses(expRes.data);
       setFeeTypes(typeRes.data);
       setIncomes(incRes.data);
+      setPayslips(payslipRes.data);
       
       if (classRes.data.length > 0 && !allocData.classroom_id) {
         setAllocData(prev => ({ ...prev, classroom_id: classRes.data[0].id.toString() }));
@@ -83,6 +93,61 @@ export default function Finance() {
       }
     } catch (error) {
       console.error("Erreur de chargement des données financières", error);
+    }
+  };
+
+  const handleGeneratePayroll = async () => {
+    setGeneratingPayroll(true);
+    try {
+      const res = await api.post('finance/payslips/generate_monthly/', {
+        month: payrollMonth,
+        year: payrollYear,
+      });
+      alert(res.data.message || 'Fiches de paie générées avec succès !');
+      await fetchData();
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Erreur lors de la génération des fiches de paie.');
+    } finally {
+      setGeneratingPayroll(false);
+    }
+  };
+
+  const downloadPayslipPdf = async (id: number) => {
+    try {
+      const response = await api.get(`finance/payslips/${id}/pdf/`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Bulletin_Paie_${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      alert("Erreur lors du téléchargement du bulletin de paie.");
+    }
+  };
+
+  const exportPayrollJournalPdf = async () => {
+    try {
+      const response = await api.get(`finance/payslips/export_payroll_journal_pdf/?month=${payrollMonth}&year=${payrollYear}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Journal_Paie_${payrollMonth}_${payrollYear}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      alert("Erreur lors du téléchargement du journal de paie.");
+    }
+  };
+
+  const togglePayslipPaid = async (id: number, currentPaid: boolean) => {
+    try {
+      await api.patch(`finance/payslips/${id}/`, { is_paid: !currentPaid });
+      fetchData();
+    } catch (error) {
+      alert("Erreur lors de la modification du statut.");
     }
   };
 
@@ -242,6 +307,13 @@ export default function Finance() {
               >
                  Types de Frais
               </button>
+              <button 
+                onClick={() => setActiveTab('payroll')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'payroll' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}
+              >
+                 💼 Fiches de Paie RH
+              </button>
+
            </div>
            
            <div className="flex flex-wrap gap-2">
@@ -541,8 +613,149 @@ export default function Finance() {
          </div>
       )}
 
+      {/* ── Fiches de Paie RH ────────────────────────────── */}
+      {activeTab === 'payroll' && (
+        <div className="space-y-6">
+          {/* Generator Panel */}
+          <div className="bg-gradient-to-r from-indigo-600 to-violet-700 rounded-2xl p-6 text-white shadow-xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-extrabold">Génération des Fiches de Paie Mensuelles</h3>
+                <p className="text-indigo-200 text-sm mt-1">Calcule automatiquement le salaire de chaque enseignant basé sur ses heures validées + salaire de base.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 bg-white/10 rounded-xl p-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-indigo-200 uppercase mb-1">Mois</label>
+                  <select 
+                    className="rounded-lg px-3 py-2 text-sm font-bold text-slate-900 border-0 bg-white"
+                    value={payrollMonth}
+                    onChange={e => setPayrollMonth(Number(e.target.value))}
+                  >
+                    {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m, i) => (
+                      <option key={i+1} value={i+1}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-indigo-200 uppercase mb-1">Année</label>
+                  <select 
+                    className="rounded-lg px-3 py-2 text-sm font-bold text-slate-900 border-0 bg-white"
+                    value={payrollYear}
+                    onChange={e => setPayrollYear(Number(e.target.value))}
+                  >
+                    {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className="block text-[10px] font-bold text-indigo-200 uppercase mb-1 invisible">Action</label>
+                  <Button
+                    onClick={handleGeneratePayroll}
+                    disabled={generatingPayroll}
+                    className="bg-white text-indigo-700 hover:bg-indigo-50 font-extrabold shadow-lg"
+                  >
+                    {generatingPayroll ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Users className="w-4 h-4 mr-2" />}
+                    Générer les Fiches
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Payslips Table */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="p-5 border-b bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="font-extrabold text-slate-900">Registre des Fiches de Paie Enseignants</h4>
+                <span className="text-xs text-slate-400 font-bold">{payslips.length} fiche(s) au total</span>
+              </div>
+              {payslips.length > 0 && (
+                <Button onClick={exportPayrollJournalPdf} variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold text-xs">
+                  <FileText className="w-4 h-4 mr-2" /> Exporter Journal de Paie (PDF)
+                </Button>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              {payslips.length === 0 ? (
+                <div className="p-16 text-center text-slate-400">
+                  <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="font-bold">Aucune fiche de paie générée</p>
+                  <p className="text-xs mt-1">Cliquez sur "Générer les Fiches" pour créer les bulletins de salaire du mois.</p>
+                </div>
+              ) : (
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase">Enseignant</th>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase text-center">Période</th>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase text-center">Heures</th>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Salaire Base</th>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Salaire Heures</th>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Net à Payer</th>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase text-center">Statut</th>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {payslips.map((p: any) => (
+                      <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-sm text-slate-900">{p.teacher_name}</div>
+                          {p.teacher_matricule && <div className="text-[10px] text-slate-400 font-mono">{p.teacher_matricule}</div>}
+                        </td>
+                        <td className="px-6 py-4 text-center text-xs font-bold text-slate-700">
+                          {String(p.month).padStart(2,'0')}/{p.year}
+                        </td>
+                        <td className="px-6 py-4 text-center text-sm font-black text-blue-700">
+                          {parseFloat(p.hours_worked || 0).toFixed(1)} h
+                        </td>
+                        <td className="px-6 py-4 text-right text-sm text-slate-700 font-semibold">
+                          {parseFloat(p.base_salary || 0).toLocaleString()} F
+                        </td>
+                        <td className="px-6 py-4 text-right text-sm text-slate-700 font-semibold">
+                          {(parseFloat(p.hours_worked || 0) * parseFloat(p.hourly_rate || 0)).toLocaleString()} F
+                        </td>
+                        <td className="px-6 py-4 text-right text-base font-extrabold text-emerald-700">
+                          {parseFloat(p.net_salary || 0).toLocaleString()} F
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={() => togglePayslipPaid(p.id, p.is_paid)}
+                            title="Cliquer pour changer le statut"
+                            className="cursor-pointer"
+                          >
+                            {p.is_paid ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors">
+                                <CheckCircle className="w-3 h-3 mr-1" /> Payé
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">
+                                <Clock className="w-3 h-3 mr-1" /> En attente
+                              </span>
+                            )}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => downloadPayslipPdf(p.id)}
+                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors inline-flex items-center gap-1 text-xs font-bold"
+                            title="Télécharger le bulletin PDF"
+                          >
+                            <FileText className="w-4 h-4" /> PDF
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Details / Payment History */}
       {showDetailsModal && selectedAlloc && (
+
          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl animate-in zoom-in duration-200 overflow-hidden overflow-x-auto">
                <div className="p-6 border-b bg-slate-50 flex justify-between items-center">

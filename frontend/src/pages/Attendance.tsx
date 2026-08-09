@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
 import api from '@/api/axios';
 import { 
   CheckCircle, XCircle, Clock, Save, Users, Filter, Loader2,
@@ -27,7 +26,7 @@ export default function AttendancePage() {
   const [activeTab, setActiveTab] = useState<'TAKE_ATTENDANCE' | 'REGISTER'>('TAKE_ATTENDANCE');
 
   // User Profile
-  const { userProfile } = useOutletContext<any>() || {};
+  const [userProfile] = useState(() => JSON.parse(localStorage.getItem('user_profile') || '{}'));
   const isAdmin = ['ADMIN', 'DIRECTION'].includes(userProfile?.role);
 
   // Take Attendance State: { enrollmentId: { status, motive, comment } }

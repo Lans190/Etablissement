@@ -65,7 +65,19 @@ class SubjectAllocationViewSet(viewsets.ModelViewSet):
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        serializer.save()
+        alloc = serializer.save()
+        try:
+            from core.views import create_notification
+            create_notification(
+                school=self.request.user.school,
+                title="Attribution de Cours",
+                message=f"Le cours {alloc.subject.name} a été attribué à {alloc.teacher.get_full_name()} pour la classe {alloc.classroom.name}.",
+                type="COURSE",
+                user=alloc.teacher
+            )
+        except Exception:
+            pass
+
 
 class DiaryEntryViewSet(viewsets.ModelViewSet):
     queryset = DiaryEntry.objects.all()
@@ -138,12 +150,42 @@ class TeachingPointageViewSet(viewsets.ModelViewSet):
 
         if user.role == 'ENSEIGNANT':
             return queryset.filter(teacher=user).order_by('-date')
-        if user.school:
-            return queryset.filter(classroom__cycle__school=user.school).order_by('-date')
+        
+        from django.db.models import Q
+        school = user.school
+        if school:
+            return queryset.filter(
+                Q(classroom__cycle__school=school) | Q(teacher__school=school)
+            ).distinct().order_by('-date')
+            
         return queryset.order_by('-date')
 
     def perform_create(self, serializer):
-        serializer.save(teacher=self.request.user, is_validated=False, status='PENDING')
+        user = self.request.user
+        teacher = user
+        if user.role in ['ADMIN', 'DIRECTION', 'COMPTABLE'] and 'teacher' in self.request.data:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                teacher = User.objects.get(id=self.request.data['teacher'])
+            except User.DoesNotExist:
+                pass
+
+        is_admin_entry = user.role in ['ADMIN', 'DIRECTION']
+        is_val = self.request.data.get('is_validated', is_admin_entry)
+        stat_val = 'VALIDATED' if is_val else 'PENDING'
+
+        pointage = serializer.save(teacher=teacher, is_validated=is_val, status=stat_val)
+        try:
+            from core.views import create_notification
+            create_notification(
+                school=pointage.teacher.school or self.request.user.school,
+                title="Nouveau Pointage Enseignant",
+                message=f"{pointage.teacher.get_full_name()} pointage de {pointage.hours_count}h enregistré ({pointage.subject.name} - {pointage.classroom.name}).",
+                type="POINTAGE"
+            )
+        except Exception:
+            pass
 
     @action(detail=False, methods=['get'])
     def summary(self, request):
@@ -162,7 +204,6 @@ class TeachingPointageViewSet(viewsets.ModelViewSet):
         })
 
     def partial_update(self, request, *args, **kwargs):
-        # Only ADMIN and DIRECTION can validate/refuse/remark pointages
         restricted_fields = ['is_validated', 'status', 'remark']
         if any(field in request.data for field in restricted_fields):
             if request.user.role not in ['ADMIN', 'DIRECTION']:
@@ -171,10 +212,8 @@ class TeachingPointageViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN
                 )
         
-        # Copy the data to avoid immutability issues
         data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
         
-        # Auto sync status and is_validated
         if 'status' in data:
             stat = data['status']
             if stat == 'VALIDATED':
@@ -190,7 +229,21 @@ class TeachingPointageViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         
+        try:
+            from core.views import create_notification
+            status_fr = "validé" if serializer.data.get('status') == 'VALIDATED' else "refusé"
+            create_notification(
+                school=instance.teacher.school or request.user.school,
+                title=f"Pointage {status_fr.capitalize()}",
+                message=f"Votre pointage du {instance.date} ({instance.hours_count}h - {instance.subject.name}) a été {status_fr}." + (f" Remarque: {instance.remark}" if instance.remark else ""),
+                type="POINTAGE",
+                user=instance.teacher
+            )
+        except Exception:
+            pass
+
         return Response(serializer.data)
+
 
 
 class ResourceViewSet(viewsets.ModelViewSet):

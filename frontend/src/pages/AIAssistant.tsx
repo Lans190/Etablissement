@@ -1,211 +1,204 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import api from '@/api/axios';
-import { 
-  Sparkles, Brain, Cpu, FileText, ArrowRight, Loader2, 
-  Activity, ShieldAlert, BadgeInfo, CheckCircle, Printer
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Bot, Send, Loader2, Sparkles, RefreshCw, User, TrendingUp, BookOpen, DollarSign } from 'lucide-react';
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
+const QUICK_QUESTIONS = [
+  { icon: '💰', label: 'Bilan financier', prompt: 'Donne-moi un résumé du bilan financier de l\'établissement : recettes, dépenses et solde.' },
+  { icon: '👥', label: 'Absences élèves', prompt: 'Quels sont les élèves qui ont le plus d\'absences ? Y a-t-il des classes particulièrement touchées ?' },
+  { icon: '📊', label: 'Statistiques globales', prompt: 'Fais-moi un résumé complet des statistiques de l\'école : élèves, enseignants, classes, assiduité.' },
+  { icon: '⏰', label: 'Pointage enseignants', prompt: 'Comment se porte le pointage des enseignants ? Y a-t-il des anomalies à signaler ?' },
+  { icon: '📈', label: 'Tendances financières', prompt: 'Analyse les tendances financières et identifie les principaux postes de dépenses.' },
+  { icon: '🎓', label: 'Performance académique', prompt: 'Quel est l\'état général de l\'établissement en termes de présence et d\'organisation pédagogique ?' },
+];
 
 export default function AIAssistant() {
-  const [analysis, setAnalysis] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
-  const [currentStep, setCurrentStep] = useState<string>('');
-  const [provider, setProvider] = useState<string>('');
-
-  const steps = [
-    "Agrégation des effectifs scolaires...",
-    "Extraction du bilan comptable (recettes & dépenses)...",
-    "Calcul du taux de recouvrement des frais...",
-    "Analyse de la courbe d'absentéisme des élèves...",
-    "Génération des recommandations via Grok AI..."
-  ];
-
-  const runAnalysis = async () => {
-    setLoading(true);
-    setAnalysis('');
-    setProvider('');
-
-    // Simulate steps for a high-fidelity visual experience
-    for (let i = 0; i < steps.length; i++) {
-      setCurrentStep(steps[i]);
-      await new Promise(resolve => setTimeout(resolve, 800));
+  const { userProfile } = (useOutletContext<any>() || {}) as any;
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: 'assistant',
+      content: `Bonjour ! Je suis votre assistant IA SeneSchool 🎓\n\nJe peux analyser les données de votre établissement et répondre à vos questions sur :\n• 💰 Les finances (recettes, dépenses, impayés)\n• 👥 Les absences et l'assiduité des élèves\n• ⏰ Le pointage des enseignants\n• 📊 Les statistiques générales\n\nQue souhaitez-vous savoir ?`,
+      timestamp: new Date(),
     }
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [schoolData, setSchoolData] = useState<any>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
+    // Charger les données contextuelles au démarrage
+    api.get('core/stats/').then(r => setSchoolData(r.data)).catch(() => {});
+  }, []);
+
+  const buildContext = (schoolData: any) => {
+    if (!schoolData) return '';
+    const s = schoolData.stats || {};
+    const cycles = (schoolData.cycles || []).map((c: any) => `${c.name}: ${c.students} élèves, ${c.teachers} enseignants`).join(' | ');
+    return `
+DONNÉES DE L'ÉTABLISSEMENT "${userProfile?.school_name || 'SeneSchool'}" :
+- Élèves inscrits : ${s.total_students ?? '?'}
+- Enseignants : ${s.total_teachers ?? '?'}
+- Classes : ${s.total_classes ?? '?'}
+- Recettes totales : ${(s.revenue ?? 0).toLocaleString()} FCFA
+- Dépenses totales : ${(s.expenses ?? 0).toLocaleString()} FCFA
+- Solde : ${(s.balance ?? 0).toLocaleString()} FCFA
+- Frais scolaires impayés : ${s.unpaid_fees ?? 0}
+- Absences aujourd'hui : ${s.today_absences ?? 0}
+- Absences en attente de validation : ${s.pending_absences ?? 0}
+- Pointages en attente de validation : ${s.pending_pointages ?? 0}
+- Répartition par cycle : ${cycles || 'Non disponible'}
+    `.trim();
+  };
+
+  const sendMessage = async (userMessage: string) => {
+    if (!userMessage.trim() || loading) return;
+
+    const userMsg: Message = { role: 'user', content: userMessage, timestamp: new Date() };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
 
     try {
-      const response = await api.get('core/grok-analysis/');
-      setAnalysis(response.data.analysis);
-      setProvider(response.data.provider);
-    } catch (error) {
-      console.error(error);
-      setAnalysis("### ❌ Erreur d'analyse\nImpossible de contacter le service d'analyse SeneSchool AI pour le moment. Veuillez réessayer plus tard.");
+      const context = buildContext(schoolData);
+      const systemPrompt = `Tu es un assistant IA expert en gestion scolaire pour l'application SeneSchool au Sénégal. Tu analyses les données d'un établissement scolaire et fournis des conseils professionnels, des analyses financières et des recommandations pédagogiques. Tu réponds toujours en français, de manière claire, structurée et actionnable. Tu utilises des émojis de manière appropriée pour rendre la réponse lisible. Voici les données actuelles de l'établissement :\n\n${context}`;
+
+      const response = await api.post('core/ai-assistant/', {
+        prompt: userMessage,
+      });
+
+      const assistantMsg: Message = {
+        role: 'assistant',
+        content: response.data.answer || 'Je n\'ai pas pu générer de réponse.',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, assistantMsg]);
+
+    } catch (err: any) {
+      const errContent = err.response?.status === 404
+        ? '⚠️ L\'intégration IA n\'est pas encore configurée sur le serveur. Veuillez configurer la clé API Grok dans les paramètres du backend.'
+        : '❌ Erreur lors de la communication avec l\'assistant IA. Vérifiez votre connexion.';
+      setMessages(prev => [...prev, { role: 'assistant', content: errContent, timestamp: new Date() }]);
     } finally {
       setLoading(false);
     }
   };
 
-  const printAnalysis = () => {
-    window.print();
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendMessage(input);
   };
 
-  // Convert basic markdown format to HTML elements manually to avoid heavy libraries
-  const renderMarkdown = (text: string) => {
-    if (!text) return null;
-    
-    const lines = text.split('\n');
-    return lines.map((line, idx) => {
-      // Headers
-      if (line.startsWith('### ')) {
-        return <h3 key={idx} className="text-lg font-extrabold text-slate-800 mt-6 mb-2 border-b pb-1">{line.replace('### ', '')}</h3>;
-      }
-      if (line.startsWith('#### ')) {
-        return <h4 key={idx} className="text-base font-bold text-slate-800 mt-4 mb-2">{line.replace('#### ', '')}</h4>;
-      }
-      if (line.startsWith('## ')) {
-        return <h2 key={idx} className="text-xl font-black text-slate-900 mt-8 mb-3">{line.replace('## ', '')}</h2>;
-      }
-      // List items
-      if (line.startsWith('- ') || line.startsWith('* ')) {
-        const content = line.substring(2);
-        return (
-          <li key={idx} className="ml-6 list-disc text-sm text-slate-600 my-1 leading-relaxed">
-            {parseBoldText(content)}
-          </li>
-        );
-      }
-      if (/^\d+\.\s/.test(line)) {
-        const content = line.replace(/^\d+\.\s/, '');
-        return (
-          <li key={idx} className="ml-6 list-decimal text-sm text-slate-600 my-1 leading-relaxed">
-            {parseBoldText(content)}
-          </li>
-        );
-      }
-      // Empty lines
-      if (line.trim() === '') {
-        return <div key={idx} className="h-2"></div>;
-      }
-      // Normal paragraph
-      return (
-        <p key={idx} className="text-sm text-slate-600 leading-relaxed my-2">
-          {parseBoldText(line)}
-        </p>
-      );
-    });
-  };
-
-  // Helper to parse **bold** and *italic* text
-  const parseBoldText = (text: string) => {
-    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} className="font-extrabold text-slate-900">{part.slice(2, -2)}</strong>;
-      }
-      if (part.startsWith('*') && part.endsWith('*')) {
-        return <em key={i} className="italic text-slate-700">{part.slice(1, -1)}</em>;
-      }
-      return part;
-    });
+  const clearConversation = () => {
+    setMessages([{
+      role: 'assistant',
+      content: 'Conversation réinitialisée. Comment puis-je vous aider ?',
+      timestamp: new Date(),
+    }]);
   };
 
   return (
-    <div className="space-y-6 pb-12 max-w-4xl mx-auto">
+    <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0">
         <div>
-          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center">
-            <Brain className="w-8 h-8 mr-3 text-indigo-600" />
-            Audit & Assistant IA (Grok)
+          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-violet-500 to-blue-600 rounded-xl text-white">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            Assistant IA SeneSchool
           </h2>
-          <p className="text-slate-500 font-medium">Analysez vos indicateurs de performance scolaire, financière et d'assiduité.</p>
+          <p className="text-slate-500 font-medium mt-1">Analysez vos données avec l'intelligence artificielle</p>
         </div>
+        <button onClick={clearConversation} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+          <RefreshCw className="w-4 h-4" />
+          Nouvelle conversation
+        </button>
       </div>
 
-      {/* Intro Card */}
-      <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-blue-900 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden print:hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -z-10"></div>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-          <div className="space-y-3 max-w-lg">
-            <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-white/10 text-xs font-bold text-indigo-300">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Grok AI Engine actif</span>
-            </div>
-            <h3 className="text-2xl font-black">Besoin d'un audit de rentabilité et d'assiduité ?</h3>
-            <p className="text-slate-300 text-xs leading-relaxed">
-              SeneSchool AI croise les paiements en attente, le taux d'absentéisme des élèves et l'activité des professeurs pour vous fournir des conseils stratégiques exploitables.
-            </p>
-          </div>
-          <div>
-            <Button 
-              onClick={runAnalysis} 
-              disabled={loading} 
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-5 rounded-xl shadow-lg shadow-indigo-500/20 w-full md:w-auto"
+      {/* Quick Questions */}
+      <div className="flex-shrink-0">
+        <p className="text-xs font-bold text-slate-400 uppercase mb-2">Questions rapides</p>
+        <div className="flex flex-wrap gap-2">
+          {QUICK_QUESTIONS.map(q => (
+            <button
+              key={q.prompt}
+              onClick={() => sendMessage(q.prompt)}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors disabled:opacity-50"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Audit en cours...
-                </>
-              ) : (
-                <>
-                  Lancer l'Audit IA
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </>
-              )}
-            </Button>
-          </div>
+              <span>{q.icon}</span> {q.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Loading Steps Indicator */}
-      {loading && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4 print:hidden animate-pulse">
-          <div className="flex items-center space-x-3 text-indigo-600 font-bold text-sm">
-            <Cpu className="w-5 h-5 animate-spin" />
-            <span>{currentStep}</span>
-          </div>
-          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-            <div className="h-full bg-indigo-600 rounded-full animate-infinite-loading w-2/3"></div>
-          </div>
-        </div>
-      )}
-
-      {/* Analysis Result */}
-      {analysis && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
-          {/* Header toolbar */}
-          <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between print:hidden">
-            <div className="flex items-center space-x-2 text-slate-500 text-xs font-bold">
-              <Activity className="w-4 h-4 text-emerald-500" />
-              <span>Diagnostic généré via : <b className="text-slate-700">{provider}</b></span>
+      {/* Chat area */}
+      <div className="flex-1 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {messages.map((msg, idx) => (
+            <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'assistant' ? 'bg-gradient-to-br from-violet-500 to-blue-600' : 'bg-slate-200'}`}>
+                {msg.role === 'assistant' ? <Bot className="w-4 h-4 text-white" /> : <User className="w-4 h-4 text-slate-600" />}
+              </div>
+              <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${msg.role === 'assistant' ? 'bg-slate-50 border border-slate-100 text-slate-800' : 'bg-blue-600 text-white'}`}>
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                <p className={`text-[10px] mt-1.5 ${msg.role === 'assistant' ? 'text-slate-400' : 'text-blue-200'}`}>
+                  {msg.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
             </div>
-            <Button variant="outline" size="sm" onClick={printAnalysis} className="h-8 px-3 text-xs border-slate-200">
-              <Printer className="w-3.5 h-3.5 mr-2" />
-              Imprimer le rapport
-            </Button>
-          </div>
-
-          {/* Styled document content */}
-          <div className="p-8 md:p-12 space-y-4 print:p-0 print:shadow-none bg-white">
-            {/* School header visible ONLY in print */}
-            <div className="hidden print:block border-b pb-4 mb-6 text-center">
-              <h1 className="text-xl font-bold text-slate-900 uppercase">Rapport Pédagogique &amp; Financier</h1>
-              <p className="text-xs text-slate-400">Généré par l'Intelligence Artificielle SeneSchool le {new Date().toLocaleDateString('fr-FR')}</p>
+          ))}
+          {loading && (
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+                <Bot className="w-4 h-4 text-white" />
+              </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <span className="text-sm text-slate-500">L'assistant réfléchit...</span>
+                </div>
+              </div>
             </div>
-
-            <div className="prose max-w-none">
-              {renderMarkdown(analysis)}
-            </div>
-          </div>
+          )}
+          <div ref={messagesEndRef} />
         </div>
-      )}
 
-      {!analysis && !loading && (
-        <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200 text-slate-400 print:hidden">
-          <Brain className="w-12 h-12 mx-auto mb-3 opacity-20 text-indigo-600" />
-          <p className="font-bold text-sm text-slate-600">Aucun audit disponible</p>
-          <p className="text-xs max-w-xs mx-auto mt-1">Cliquez sur le bouton ci-dessus pour compiler les données d'établissement et lancer l'intelligence artificielle.</p>
+        {/* Input */}
+        <div className="border-t border-slate-100 p-4">
+          <form onSubmit={handleSubmit} className="flex gap-3">
+            <input
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              placeholder="Posez votre question sur les données de l'établissement..."
+              disabled={loading}
+              className="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-500 bg-slate-50 disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              className="px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl transition-colors flex items-center gap-2 font-bold"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+          <p className="text-[10px] text-slate-400 mt-2 text-center">
+            L'IA analyse les données en temps réel de votre établissement · Propulsé par Grok (xAI)
+          </p>
         </div>
-      )}
+      </div>
     </div>
   );
 }
