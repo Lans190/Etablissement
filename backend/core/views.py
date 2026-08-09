@@ -327,131 +327,123 @@ class GrokAIAssistantView(APIView):
         first_day_last_month = last_month_end.replace(day=1)
         start_of_week = today - timedelta(days=today.weekday())
 
-        # A. Effectifs & Classes
-        total_students = Enrollment.objects.filter(classroom__cycle__school=school, is_active=True).count()
-        total_teachers = User.objects.filter(school=school, role='ENSEIGNANT').count()
-        total_classes = ClassRoom.objects.filter(cycle__school=school).count()
+        try:
+            # A. Effectifs & Classes
+            total_students = Enrollment.objects.filter(classroom__cycle__school=school, is_active=True).count() if school else Enrollment.objects.filter(is_active=True).count()
+            total_teachers = User.objects.filter(school=school, role='ENSEIGNANT').count() if school else User.objects.filter(role='ENSEIGNANT').count()
+            total_classes = ClassRoom.objects.filter(cycle__school=school).count() if school else ClassRoom.objects.count()
 
-        top_class = ClassRoom.objects.filter(cycle__school=school).annotate(
-            c_count=Count('enrollments', filter=Q(enrollments__is_active=True))
-        ).order_by('-c_count').first()
-        top_class_name = f"{top_class.name} ({top_class.c_count} élèves)" if top_class else "Non définie"
+            top_class_qs = ClassRoom.objects.filter(cycle__school=school) if school else ClassRoom.objects.all()
+            top_class = top_class_qs.annotate(
+                c_count=Count('enrollments', filter=Q(enrollments__is_active=True))
+            ).order_by('-c_count').first()
+            top_class_name = f"{top_class.name} ({top_class.c_count} élèves)" if top_class else "Non définie"
 
-        # B. Finances - Recettes, Dépenses, Mois Actuel vs Dernier
-        recettes_totales = Payment.objects.filter(
-            fee_allocation__enrollment__classroom__cycle__school=school
-        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+            # B. Finances - Recettes, Dépenses, Mois Actuel vs Dernier
+            recettes_totales = Payment.objects.aggregate(total=Sum('amount_paid'))['total'] or 0
+            recettes_mois_actuel = Payment.objects.filter(payment_date__gte=first_day_this_month).aggregate(total=Sum('amount_paid'))['total'] or 0
+            recettes_mois_dernier = Payment.objects.filter(payment_date__gte=first_day_last_month, payment_date__lte=last_month_end).aggregate(total=Sum('amount_paid'))['total'] or 0
 
-        recettes_mois_actuel = Payment.objects.filter(
-            fee_allocation__enrollment__classroom__cycle__school=school,
-            payment_date__gte=first_day_this_month
-        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+            depenses_totales = Expense.objects.aggregate(total=Sum('amount'))['total'] or 0
+            depenses_mois_actuel = Expense.objects.filter(date__gte=first_day_this_month).aggregate(total=Sum('amount'))['total'] or 0
+            net_balance = recettes_totales - depenses_totales
 
-        recettes_mois_dernier = Payment.objects.filter(
-            fee_allocation__enrollment__classroom__cycle__school=school,
-            payment_date__gte=first_day_last_month,
-            payment_date__lte=last_month_end
-        ).aggregate(total=Sum('amount_paid'))['total'] or 0
+            # Poste de dépense le plus cher
+            top_expense_cat = Expense.objects.values('category').annotate(cat_sum=Sum('amount')).order_by('-cat_sum').first()
+            top_expense_cat_name = f"{top_expense_cat['category']} ({float(top_expense_cat['cat_sum']):,.0f} FCFA)" if top_expense_cat else "Aucune dépense"
 
-        depenses_totales = Expense.objects.filter(school=school).aggregate(total=Sum('amount'))['total'] or 0
+            # Impayés et Acomptes
+            unpaid_allocations = FeeAllocation.objects.filter(is_paid=False)
+            unpaid_count = unpaid_allocations.count()
+            unpaid_sum = unpaid_allocations.aggregate(total=Sum('amount'))['total'] or 0
 
-        depenses_mois_actuel = Expense.objects.filter(
-            school=school,
-            date__gte=first_day_this_month
-        ).aggregate(total=Sum('amount'))['total'] or 0
+            # Liste des élèves en impayé
+            unpaid_students_qs = unpaid_allocations.select_related('enrollment__student', 'enrollment__classroom')[:10]
+            unpaid_students_list = [
+                f"{a.enrollment.student.get_full_name()} ({a.enrollment.classroom.name}) : reste {float(a.amount - a.amount_paid):,.0f} FCFA"
+                for a in unpaid_students_qs if a.enrollment and a.enrollment.student and a.enrollment.classroom
+            ]
 
-        net_balance = recettes_totales - depenses_totales
+            # Acomptes
+            acomptes_qs = FeeAllocation.objects.filter(amount_paid__gt=0, is_paid=False)
+            acomptes_count = acomptes_qs.count()
+            acomptes_list = [
+                f"{a.enrollment.student.get_full_name()} ({a.enrollment.classroom.name}) : payé {float(a.amount_paid):,.0f} / {float(a.amount):,.0f} FCFA"
+                for a in acomptes_qs.select_related('enrollment__student', 'enrollment__classroom')[:10] if a.enrollment and a.enrollment.student and a.enrollment.classroom
+            ]
 
-        # Poste de dépense le plus cher
-        top_expense_cat = Expense.objects.filter(school=school).values('category').annotate(
-            cat_sum=Sum('amount')
-        ).order_by('-cat_sum').first()
-        top_expense_cat_name = f"{top_expense_cat['category']} ({float(top_expense_cat['cat_sum']):,.0f} FCFA)" if top_expense_cat else "Aucune dépense"
+            # C. Enseignants & Salaires
+            teachers_qs = User.objects.filter(role='ENSEIGNANT')
+            if school:
+                teachers_qs = teachers_qs.filter(school=school)
+            teachers_payroll_summary = []
+            for t in teachers_qs:
+                h_count = TeachingPointage.objects.filter(
+                    teacher=t
+                ).filter(Q(status='VALIDATED') | Q(is_validated=True)).aggregate(total=Sum('hours_count'))['total'] or 0
+                h_rate = float(t.hourly_rate or 0)
+                base_sal = float(t.base_salary or 0)
+                allowances = float(t.allowances or 0)
+                deductions = float(t.deductions or 0)
+                calculated_salary = (float(h_count) * h_rate) + base_sal + allowances - deductions
+                teachers_payroll_summary.append({
+                    "nom": t.get_full_name(),
+                    "heures": float(h_count),
+                    "taux": h_rate,
+                    "base": base_sal,
+                    "primes": allowances,
+                    "cotisations": deductions,
+                    "salaire_net": calculated_salary
+                })
 
-        # Impayés et Acomptes
-        unpaid_allocations = FeeAllocation.objects.filter(
-            enrollment__classroom__cycle__school=school,
-            is_paid=False
-        )
-        unpaid_count = unpaid_allocations.count()
-        unpaid_sum = unpaid_allocations.aggregate(total=Sum('amount'))['total'] or 0
+            # D. Présences & Absences
+            today_absences = Attendance.objects.filter(date=today, status='ABSENT').count()
 
-        # Liste des élèves en impayé
-        unpaid_students_qs = unpaid_allocations.select_related('enrollment__student', 'enrollment__classroom')[:10]
-        unpaid_students_list = [
-            f"{a.enrollment.student.get_full_name()} ({a.enrollment.classroom.name}) : reste {float(a.amount - a.amount_paid):,.0f} FCFA"
-            for a in unpaid_students_qs
-        ]
+            # Taux de présence cette semaine
+            week_attendances = Attendance.objects.filter(date__gte=start_of_week)
+            total_week_records = week_attendances.count()
+            present_week_records = week_attendances.filter(status='PRESENT').count()
+            week_presence_rate = round((present_week_records / total_week_records * 100), 1) if total_week_records > 0 else 100.0
 
-        # Acomptes
-        acomptes_qs = FeeAllocation.objects.filter(
-            enrollment__classroom__cycle__school=school,
-            amount_paid__gt=0,
-            is_paid=False
-        )
-        acomptes_count = acomptes_qs.count()
-        acomptes_list = [
-            f"{a.enrollment.student.get_full_name()} ({a.enrollment.classroom.name}) : payé {float(a.amount_paid):,.0f} / {float(a.amount):,.0f} FCFA"
-            for a in acomptes_qs.select_related('enrollment__student', 'enrollment__classroom')[:10]
-        ]
+            # Classe la plus absente
+            worst_class_abs = ClassRoom.objects.annotate(
+                abs_c=Count('enrollments__attendances', filter=Q(enrollments__attendances__status='ABSENT'))
+            ).order_by('-abs_c').first()
+            worst_class_abs_name = f"{worst_class_abs.name} ({worst_class_abs.abs_c} absences)" if worst_class_abs else "Aucune"
 
-        # C. Enseignants & Salaires
-        teachers_qs = User.objects.filter(school=school, role='ENSEIGNANT')
-        teachers_payroll_summary = []
-        for t in teachers_qs:
-            h_count = TeachingPointage.objects.filter(
-                teacher=t,
-                status='VALIDATED'
-            ).aggregate(total=Sum('hours_count'))['total'] or 0
-            h_rate = float(t.hourly_rate or 0)
-            base_sal = float(t.base_salary or 0)
-            allowances = float(t.allowances or 0)
-            deductions = float(t.deductions or 0)
-            calculated_salary = (h_count * h_rate) + base_sal + allowances - deductions
-            teachers_payroll_summary.append({
-                "nom": t.get_full_name(),
-                "heures": float(h_count),
-                "taux": h_rate,
-                "base": base_sal,
-                "primes": allowances,
-                "cotisations": deductions,
-                "salaire_net": calculated_salary
-            })
+            # Élèves les plus absents
+            top_absent_students_qs = Attendance.objects.filter(
+                status='ABSENT'
+            ).values('enrollment__student__first_name', 'enrollment__student__last_name', 'enrollment__classroom__name').annotate(
+                total_abs=Count('id')
+            ).order_by('-total_abs')[:5]
 
-        # D. Présences & Absences
-        today_absences = Attendance.objects.filter(
-            enrollment__classroom__cycle__school=school,
-            date=today,
-            status='ABSENT'
-        ).count()
-
-        # Taux de présence cette semaine
-        week_attendances = Attendance.objects.filter(
-            enrollment__classroom__cycle__school=school,
-            date__gte=start_of_week
-        )
-        total_week_records = week_attendances.count()
-        present_week_records = week_attendances.filter(status='PRESENT').count()
-        week_presence_rate = round((present_week_records / total_week_records * 100), 1) if total_week_records > 0 else 100.0
-
-        # Classe la plus absente
-        worst_class_abs = ClassRoom.objects.filter(cycle__school=school).annotate(
-            abs_c=Count('enrollments__attendances', filter=Q(enrollments__attendances__status='ABSENT'))
-        ).order_by('-abs_c').first()
-        worst_class_abs_name = f"{worst_class_abs.name} ({worst_class_abs.abs_c} absences)" if worst_class_abs else "Aucune"
-
-        # Élèves les plus absents
-        top_absent_students_qs = Attendance.objects.filter(
-            enrollment__classroom__cycle__school=school,
-            status='ABSENT'
-        ).values('enrollment__student__first_name', 'enrollment__student__last_name', 'enrollment__classroom__name').annotate(
-            total_abs=Count('id')
-        ).order_by('-total_abs')[:5]
-
-        top_absent_students_list = [
-            f"{s['enrollment__student__first_name']} {s['enrollment__student__last_name']} ({s['enrollment__classroom__name']}) : {s['total_abs']} absence(s)"
-            for s in top_absent_students_qs
-        ]
+            top_absent_students_list = [
+                f"{s['enrollment__student__first_name']} {s['enrollment__student__last_name']} ({s['enrollment__classroom__name']}) : {s['total_abs']} absence(s)"
+                for s in top_absent_students_qs if s.get('enrollment__student__first_name')
+            ]
+        except Exception as err:
+            total_students = 0
+            total_teachers = 0
+            total_classes = 0
+            top_class_name = "Non disponible"
+            recettes_totales = 0
+            recettes_mois_actuel = 0
+            recettes_mois_dernier = 0
+            depenses_totales = 0
+            depenses_mois_actuel = 0
+            net_balance = 0
+            top_expense_cat_name = "Aucune"
+            unpaid_count = 0
+            unpaid_sum = 0
+            unpaid_students_list = []
+            acomptes_count = 0
+            acomptes_list = []
+            teachers_payroll_summary = []
+            today_absences = 0
+            week_presence_rate = 100.0
+            worst_class_abs_name = "Aucune"
+            top_absent_students_list = []
 
         context_data = {
             "nom_etablissement": school.name if school else "Établissement",
