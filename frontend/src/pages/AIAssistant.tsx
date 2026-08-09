@@ -166,8 +166,38 @@ DONNÉES DE L'ÉTABLISSEMENT "${userProfile?.school_name || 'SeneSchool'}" :
               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'assistant' ? 'bg-gradient-to-br from-violet-500 to-blue-600' : 'bg-slate-200'}`}>
                 {msg.role === 'assistant' ? <Bot className="w-4 h-4 text-white" /> : <User className="w-4 h-4 text-slate-600" />}
               </div>
-              <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${msg.role === 'assistant' ? 'bg-slate-50 border border-slate-100 text-slate-800' : 'bg-blue-600 text-white'}`}>
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+              <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${msg.role === 'assistant' ? 'bg-slate-50 border border-slate-100 text-slate-800' : 'bg-blue-600 text-white'}`}>
+                {msg.role === 'assistant' ? (
+                  <div className="space-y-1.5 text-sm leading-relaxed">
+                    {msg.content.split('\n').map((line, i) => {
+                      if (line.startsWith('# ')) return <h1 key={i} className="text-lg font-bold text-slate-900 mt-2 mb-1">{line.replace('# ', '')}</h1>;
+                      if (line.startsWith('## ')) return <h2 key={i} className="text-base font-bold text-slate-800 mt-2 mb-1">{line.replace('## ', '')}</h2>;
+                      if (line.startsWith('### ')) return <h3 key={i} className="text-sm font-bold text-blue-900 mt-2 mb-1">{line.replace('### ', '')}</h3>;
+                      if (line.startsWith('#### ')) return <h4 key={i} className="text-xs font-bold text-slate-700 mt-1">{line.replace('#### ', '')}</h4>;
+                      
+                      const parts = line.split(/(\*\*.*?\*\*|`.*?`)/g);
+                      return (
+                        <div key={i} className={line.trim() === '---' ? 'border-b border-slate-200 my-2' : ''}>
+                          {line.trim() === '---' ? null : (
+                            <p>
+                              {parts.map((part, pIdx) => {
+                                if (part.startsWith('**') && part.endsWith('**')) {
+                                  return <strong key={pIdx} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>;
+                                }
+                                if (part.startsWith('`') && part.endsWith('`')) {
+                                  return <code key={pIdx} className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-xs font-mono border border-blue-100">{part.slice(1, -1)}</code>;
+                                }
+                                return part;
+                              })}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                )}
                 <p className={`text-[10px] mt-1.5 ${msg.role === 'assistant' ? 'text-slate-400' : 'text-blue-200'}`}>
                   {msg.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 </p>
