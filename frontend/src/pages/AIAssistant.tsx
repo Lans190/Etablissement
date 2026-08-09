@@ -29,7 +29,7 @@ export default function AIAssistant() {
         </div>
         <h3 className="font-extrabold text-slate-900 text-lg mb-2">Accès Restreint</h3>
         <p className="text-slate-500 text-sm font-medium">
-          L'accès et l'utilisation de l'Assistant IA Grok sont strictement réservés à l'administration de l'établissement.
+          L'accès et l'utilisation de l'Assistant IA sont strictement réservés à l'administration de l'établissement.
         </p>
       </div>
     );
@@ -210,7 +210,7 @@ DONNÉES DE L'ÉTABLISSEMENT "${userProfile?.school_name || 'SeneSchool'}" :
             </button>
           </form>
           <p className="text-[10px] text-slate-400 mt-2 text-center">
-            L'IA analyse les données en temps réel de votre établissement · Propulsé par Grok (xAI)
+            L'IA analyse les données en temps réel de votre établissement · Assistant IA SeneSchool
           </p>
         </div>
       </div>

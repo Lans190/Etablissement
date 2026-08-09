@@ -1,5 +1,6 @@
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
+from datetime import date as dt_date, datetime
 from .models import School, Cycle, AcademicYear, ClassRoom
 from .serializers import SchoolSerializer, CycleSerializer, AcademicYearSerializer, ClassRoomSerializer
 
@@ -301,7 +302,7 @@ class GrokAIAssistantView(APIView):
         user = request.user
         if user.role not in ['ADMIN', 'DIRECTION']:
             return Response(
-                {"detail": "Accès refusé. L'utilisation de l'Assistant IA Grok est réservée exclusivement à l'administration de l'établissement."},
+                {"detail": "Accès refusé. L'utilisation de l'Assistant IA est réservée exclusivement à l'administration de l'établissement."},
                 status=status.HTTP_403_FORBIDDEN
             )
 
@@ -370,7 +371,7 @@ class GrokAIAssistantView(APIView):
         }
 
         system_instruction = (
-            f"Vous êtes Grok, l'Assistant IA officiel d'analyse de données pour l'établissement scolaire {context_data['nom_etablissement']}.\n"
+            f"Vous êtes l'Assistant IA officiel d'analyse de données pour l'établissement scolaire {context_data['nom_etablissement']}.\n"
             "Vous répondez exclusivement sur la base des données réelles ci-dessous extraites directement de PostgreSQL.\n"
             "Soyez précis, professionnel, avec un ton structuré et constructif (utilisez le symbole FCFA, des puces de texte, des tableaux en Markdown si pertinent).\n"
             "Ne réinventez pas les chiffres. Si une donnée n'est pas disponible, indiquez-le clairement.\n\n"
