@@ -217,57 +217,62 @@ export default function Users() {
                     <option value="DIRECTION">Direction / Admin École</option>
                   </select>
 
-                  {/* Grille Salariale pour les enseignants (Placée immédiatement sous le sélecteur de rôle) */}
-                  {(formData.role === 'ENSEIGNANT' || formData.role === 'TEACHER' || formData.role?.toUpperCase() === 'ENSEIGNANT') && (
-                    <div className="mt-3 bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-300 shadow-md space-y-3 animate-in fade-in zoom-in duration-150">
+                  {/* Grille Salariale RH : PERMANENTE ET VISIBLE EN PERMANENCE DANS LA MODAL */}
+                  <div className="mt-3 bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-300 shadow-md space-y-3">
+                    <div className="flex items-center justify-between">
                       <p className="text-xs font-black text-indigo-900 uppercase flex items-center">
                         <GraduationCap className="w-4 h-4 mr-1.5 text-indigo-600" />
-                        ⚙️ Paramètres Salariaux de l'Enseignant
+                        ⚙️ Paramètres Salariaux RH (Taux Horaire &amp; Paie)
                       </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-bold text-indigo-700 uppercase mb-1">Taux Horaire (FCFA/Heure)</label>
-                          <input
-                            type="number"
-                            placeholder="ex: 2000"
-                            className="w-full border-2 border-indigo-200 bg-white rounded-xl p-3 text-sm font-black text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
-                            value={formData.hourly_rate}
-                            onChange={(e) => setFormData({...formData, hourly_rate: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Salaire Fixe (FCFA)</label>
-                          <input
-                            type="number"
-                            placeholder="ex: 150000"
-                            className="w-full border border-slate-200 bg-white rounded-xl p-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-slate-500"
-                            value={formData.base_salary}
-                            onChange={(e) => setFormData({...formData, base_salary: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-emerald-700 uppercase mb-1">Primes (+) FCFA</label>
-                          <input
-                            type="number"
-                            placeholder="ex: 25000"
-                            className="w-full border border-emerald-200 bg-white rounded-xl p-3 text-sm font-bold text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500"
-                            value={formData.allowances}
-                            onChange={(e) => setFormData({...formData, allowances: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-bold text-rose-700 uppercase mb-1">Cotisations (-) FCFA</label>
-                          <input
-                            type="number"
-                            placeholder="ex: 10000"
-                            className="w-full border border-rose-200 bg-white rounded-xl p-3 text-sm font-bold text-rose-700 outline-none focus:ring-2 focus:ring-rose-500"
-                            value={formData.deductions}
-                            onChange={(e) => setFormData({...formData, deductions: e.target.value})}
-                          />
-                        </div>
+                      {formData.role !== 'ENSEIGNANT' && (
+                        <span className="text-[10px] bg-indigo-100 text-indigo-800 font-extrabold px-2 py-0.5 rounded-full">
+                          Prise en compte si Enseignant
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-indigo-700 uppercase mb-1">Taux Horaire (FCFA/h)</label>
+                        <input
+                          type="number"
+                          placeholder="ex: 2000"
+                          className="w-full border-2 border-indigo-200 bg-white rounded-xl p-3 text-sm font-black text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
+                          value={formData.hourly_rate}
+                          onChange={(e) => setFormData({...formData, hourly_rate: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Salaire Fixe (FCFA)</label>
+                        <input
+                          type="number"
+                          placeholder="ex: 150000"
+                          className="w-full border border-slate-200 bg-white rounded-xl p-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-slate-500"
+                          value={formData.base_salary}
+                          onChange={(e) => setFormData({...formData, base_salary: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-emerald-700 uppercase mb-1">Primes (+) FCFA</label>
+                        <input
+                          type="number"
+                          placeholder="ex: 25000"
+                          className="w-full border border-emerald-200 bg-white rounded-xl p-3 text-sm font-bold text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500"
+                          value={formData.allowances}
+                          onChange={(e) => setFormData({...formData, allowances: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-rose-700 uppercase mb-1">Cotisations (-) FCFA</label>
+                        <input
+                          type="number"
+                          placeholder="ex: 10000"
+                          className="w-full border border-rose-200 bg-white rounded-xl p-3 text-sm font-bold text-rose-700 outline-none focus:ring-2 focus:ring-rose-500"
+                          value={formData.deductions}
+                          onChange={(e) => setFormData({...formData, deductions: e.target.value})}
+                        />
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
                 
                 <div>
