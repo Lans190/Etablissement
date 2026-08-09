@@ -217,14 +217,56 @@ export default function Users() {
                     <option value="DIRECTION">Direction / Admin École</option>
                   </select>
 
-                  {formData.role === 'ENSEIGNANT' ? (
-                    <p className="text-[11px] font-bold text-blue-600 mt-1.5 flex items-center">
-                      ✨ Le formulaire inclut les champs Taux Horaire, Primes &amp; Cotisations ci-dessous.
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-slate-400 mt-1 italic">
-                      💡 Sélectionnez <strong>Enseignant</strong> pour définir un Taux Horaire (ex: 2000 F/h), Salaire et Cotisations.
-                    </p>
+                  {/* Grille Salariale pour les enseignants (Placée immédiatement sous le sélecteur de rôle) */}
+                  {formData.role === 'ENSEIGNANT' && (
+                    <div className="mt-3 bg-indigo-50 p-4 rounded-2xl border border-indigo-200 shadow-sm space-y-3 animate-in fade-in zoom-in duration-150">
+                      <p className="text-xs font-black text-indigo-900 uppercase flex items-center">
+                        <GraduationCap className="w-4 h-4 mr-1.5 text-indigo-600" />
+                        ⚙️ Paramètres Salariaux de l'Enseignant
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-indigo-700 uppercase mb-1">Taux Horaire (FCFA/Heure)</label>
+                          <input
+                            type="number"
+                            placeholder="ex: 2000"
+                            className="w-full border-2 border-indigo-200 bg-white rounded-xl p-3 text-sm font-black text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
+                            value={formData.hourly_rate}
+                            onChange={(e) => setFormData({...formData, hourly_rate: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Salaire Fixe (FCFA)</label>
+                          <input
+                            type="number"
+                            placeholder="ex: 150000"
+                            className="w-full border border-slate-200 bg-white rounded-xl p-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-slate-500"
+                            value={formData.base_salary}
+                            onChange={(e) => setFormData({...formData, base_salary: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-emerald-700 uppercase mb-1">Primes (+) FCFA</label>
+                          <input
+                            type="number"
+                            placeholder="ex: 25000"
+                            className="w-full border border-emerald-200 bg-white rounded-xl p-3 text-sm font-bold text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.allowances}
+                            onChange={(e) => setFormData({...formData, allowances: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-rose-700 uppercase mb-1">Cotisations (-) FCFA</label>
+                          <input
+                            type="number"
+                            placeholder="ex: 10000"
+                            className="w-full border border-rose-200 bg-white rounded-xl p-3 text-sm font-bold text-rose-700 outline-none focus:ring-2 focus:ring-rose-500"
+                            value={formData.deductions}
+                            onChange={(e) => setFormData({...formData, deductions: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
                 
@@ -283,58 +325,6 @@ export default function Users() {
                     />
                   </div>
                 </div>
-
-                {/* Grille Salariale pour les enseignants */}
-                {formData.role === 'ENSEIGNANT' && (
-                  <div className="col-span-2 bg-blue-50/60 p-4 rounded-2xl border border-blue-100 space-y-3">
-                    <p className="text-xs font-black text-blue-900 uppercase flex items-center">
-                      <GraduationCap className="w-4 h-4 mr-1.5 text-blue-600" />
-                      Paramètres Salariaux de l'Enseignant
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-blue-700 uppercase mb-1">Taux Horaire (FCFA/Heure)</label>
-                        <input
-                          type="number"
-                          placeholder="ex: 2000"
-                          className="w-full border-none bg-white rounded-xl p-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-                          value={formData.hourly_rate}
-                          onChange={(e) => setFormData({...formData, hourly_rate: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-blue-700 uppercase mb-1">Salaire de Base Fixe (FCFA)</label>
-                        <input
-                          type="number"
-                          placeholder="ex: 150000"
-                          className="w-full border-none bg-white rounded-xl p-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-                          value={formData.base_salary}
-                          onChange={(e) => setFormData({...formData, base_salary: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-emerald-700 uppercase mb-1">Primes & Indemnités (+) FCFA</label>
-                        <input
-                          type="number"
-                          placeholder="ex: 25000"
-                          className="w-full border-none bg-white rounded-xl p-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
-                          value={formData.allowances}
-                          onChange={(e) => setFormData({...formData, allowances: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-rose-700 uppercase mb-1">Cotisations & Retenues (-) FCFA</label>
-                        <input
-                          type="number"
-                          placeholder="ex: 10000"
-                          className="w-full border-none bg-white rounded-xl p-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-rose-500 shadow-sm"
-                          value={formData.deductions}
-                          onChange={(e) => setFormData({...formData, deductions: e.target.value})}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Scan CNI */}
                 <div className="col-span-2">
