@@ -204,10 +204,17 @@ export default function Layout() {
             {['ELEVE', 'PARENT'].includes(userProfile?.role || '') ? 'Mes Bulletins' : 'Bulletins Officiels'}
           </Link>
 
+          {['ADMIN', 'DIRECTION', 'ENSEIGNANT'].includes(role) && (
+            <Link to="/attendance" className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/attendance') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+              <UserCheck className="w-5 h-5 mr-3 text-emerald-400" />
+              Appel &amp; Présences Élèves
+            </Link>
+          )}
+
           {canSeeFinance && (
             <Link to="/finance" className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/finance') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-              <Wallet className="w-5 h-5 mr-3" />
-              Finance &amp; Paie RH
+              <Wallet className="w-5 h-5 mr-3 text-amber-400" />
+              {role === 'ENSEIGNANT' ? 'Mon Salaire & Fiches de Paie' : 'Finance & Paie RH'}
             </Link>
           )}
 
@@ -217,10 +224,6 @@ export default function Layout() {
               <Link to="/students" className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/students') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                 <Users className="w-5 h-5 mr-3" />
                 Élèves & Parents
-              </Link>
-              <Link to="/attendance" className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/attendance') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-                <UserCheck className="w-5 h-5 mr-3" />
-                Appel & Présences
               </Link>
               <Link to="/users" className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive('/users') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
                 <UserCog className="w-5 h-5 mr-3" />

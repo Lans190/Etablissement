@@ -151,9 +151,14 @@ export default function Finance() {
     }
   };
 
+  const isTeacher = userProfile?.role === 'ENSEIGNANT';
+
   useEffect(() => {
+    if (isTeacher) {
+      setActiveTab('payroll');
+    }
     fetchData();
-  }, []);
+  }, [userProfile?.role]);
 
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,29 +294,33 @@ export default function Finance() {
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
            <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto">
-              <button 
-                onClick={() => setActiveTab('incomes')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'incomes' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
-              >
-                 Recettes
-              </button>
-              <button 
-                onClick={() => setActiveTab('expenses')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'expenses' ? 'bg-white shadow-sm text-red-600' : 'text-slate-500'}`}
-              >
-                 Dépenses
-              </button>
-              <button 
-                onClick={() => setActiveTab('fee_types')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'fee_types' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500'}`}
-              >
-                 Types de Frais
-              </button>
+              {!isTeacher && (
+                <>
+                  <button 
+                    onClick={() => setActiveTab('incomes')}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'incomes' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                  >
+                     Recettes
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('expenses')}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'expenses' ? 'bg-white shadow-sm text-red-600' : 'text-slate-500'}`}
+                  >
+                     Dépenses
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('fee_types')}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'fee_types' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500'}`}
+                  >
+                     Types de Frais
+                  </button>
+                </>
+              )}
               <button 
                 onClick={() => setActiveTab('payroll')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'payroll' ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'}`}
               >
-                 💼 Fiches de Paie RH
+                 💼 {isTeacher ? 'Mes Bulletins de Salaire & Paie' : 'Fiches de Paie RH'}
               </button>
 
            </div>
@@ -617,49 +626,63 @@ export default function Finance() {
       {activeTab === 'payroll' && (
         <div className="space-y-6">
           {/* Generator Panel */}
-          <div className="bg-gradient-to-r from-indigo-600 to-violet-700 rounded-2xl p-6 text-white shadow-xl">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-extrabold">Génération des Fiches de Paie Mensuelles</h3>
-                <p className="text-indigo-200 text-sm mt-1">Calcule automatiquement le salaire de chaque enseignant basé sur ses heures validées + salaire de base.</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 bg-white/10 rounded-xl p-4">
+          {isTeacher ? (
+            <div className="bg-gradient-to-r from-indigo-700 via-purple-700 to-slate-900 rounded-2xl p-6 text-white shadow-xl">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-indigo-200 uppercase mb-1">Mois</label>
-                  <select 
-                    className="rounded-lg px-3 py-2 text-sm font-bold text-slate-900 border-0 bg-white"
-                    value={payrollMonth}
-                    onChange={e => setPayrollMonth(Number(e.target.value))}
-                  >
-                    {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m, i) => (
-                      <option key={i+1} value={i+1}>{m}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-indigo-200 uppercase mb-1">Année</label>
-                  <select 
-                    className="rounded-lg px-3 py-2 text-sm font-bold text-slate-900 border-0 bg-white"
-                    value={payrollYear}
-                    onChange={e => setPayrollYear(Number(e.target.value))}
-                  >
-                    {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                </div>
-                <div className="flex flex-col">
-                  <label className="block text-[10px] font-bold text-indigo-200 uppercase mb-1 invisible">Action</label>
-                  <Button
-                    onClick={handleGeneratePayroll}
-                    disabled={generatingPayroll}
-                    className="bg-white text-indigo-700 hover:bg-indigo-50 font-extrabold shadow-lg"
-                  >
-                    {generatingPayroll ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Users className="w-4 h-4 mr-2" />}
-                    Générer les Fiches
-                  </Button>
+                  <span className="inline-block px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-indigo-200 tracking-wider uppercase mb-2">
+                    💵 Espace Rémunération Enseignant
+                  </span>
+                  <h3 className="text-2xl font-black">Mon Suivi de Paie &amp; Bulletins Officiels</h3>
+                  <p className="text-indigo-200 text-sm mt-1">Consultez l'historique complet de vos salaires, vos heures validées et téléchargez vos bulletins de paie en PDF.</p>
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-gradient-to-r from-indigo-600 to-violet-700 rounded-2xl p-6 text-white shadow-xl">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-extrabold">Génération des Fiches de Paie Mensuelles</h3>
+                  <p className="text-indigo-200 text-sm mt-1">Calcule automatiquement le salaire de chaque enseignant basé sur ses heures validées + salaire de base.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 bg-white/10 rounded-xl p-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-indigo-200 uppercase mb-1">Mois</label>
+                    <select 
+                      className="rounded-lg px-3 py-2 text-sm font-bold text-slate-900 border-0 bg-white"
+                      value={payrollMonth}
+                      onChange={e => setPayrollMonth(Number(e.target.value))}
+                    >
+                      {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m, i) => (
+                        <option key={i+1} value={i+1}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-indigo-200 uppercase mb-1">Année</label>
+                    <select 
+                      className="rounded-lg px-3 py-2 text-sm font-bold text-slate-900 border-0 bg-white"
+                      value={payrollYear}
+                      onChange={e => setPayrollYear(Number(e.target.value))}
+                    >
+                      {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="block text-[10px] font-bold text-indigo-200 uppercase mb-1 invisible">Action</label>
+                    <Button
+                      onClick={handleGeneratePayroll}
+                      disabled={generatingPayroll}
+                      className="bg-white text-indigo-700 hover:bg-indigo-50 font-extrabold shadow-lg"
+                    >
+                      {generatingPayroll ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Users className="w-4 h-4 mr-2" />}
+                      Générer les Fiches
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Payslips Table */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -718,21 +741,33 @@ export default function Finance() {
                           {parseFloat(p.net_salary || 0).toLocaleString()} F
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => togglePayslipPaid(p.id, p.is_paid)}
-                            title="Cliquer pour changer le statut"
-                            className="cursor-pointer"
-                          >
-                            {p.is_paid ? (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors">
+                          {!isTeacher ? (
+                            <button
+                              onClick={() => togglePayslipPaid(p.id, p.is_paid)}
+                              title="Cliquer pour changer le statut"
+                              className="cursor-pointer"
+                            >
+                              {p.is_paid ? (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors">
+                                  <CheckCircle className="w-3 h-3 mr-1" /> Payé
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">
+                                  <Clock className="w-3 h-3 mr-1" /> En attente
+                                </span>
+                              )}
+                            </button>
+                          ) : (
+                            p.is_paid ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <CheckCircle className="w-3 h-3 mr-1" /> Payé
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                                 <Clock className="w-3 h-3 mr-1" /> En attente
                               </span>
-                            )}
-                          </button>
+                            )
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button

@@ -89,6 +89,56 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Banner Espace Enseignant pour les professeurs */}
+      {userProfile?.role === 'ENSEIGNANT' && (
+        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 rounded-3xl p-8 text-white shadow-xl">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <span className="inline-block px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-blue-200 tracking-wider uppercase mb-2">
+                🎓 Espace Pédagogique Enseignant
+              </span>
+              <h2 className="text-3xl font-black">Bienvenue, {userProfile.first_name || 'Enseignant'} {userProfile.last_name || ''}</h2>
+              <p className="text-blue-100 text-sm mt-1">Accédez directement à la gestion de vos cours, la saisie des notes, les appels et le suivi de votre paie.</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/attendance" className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-3 rounded-2xl font-black text-xs shadow-lg transition-all flex items-center">
+                <CheckCircle className="w-4 h-4 mr-2" /> Faire l'Appel
+              </Link>
+              <Link to="/pointage" className="bg-white/20 hover:bg-white/30 text-white px-5 py-3 rounded-2xl font-black text-xs backdrop-blur-sm transition-all flex items-center">
+                <Clock className="w-4 h-4 mr-2" /> Mon Pointage
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-8 pt-6 border-t border-white/10">
+            <Link to="/timetable" className="p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all text-center group">
+              <div className="text-amber-300 font-bold text-xl mb-1 group-hover:scale-110 transition-transform">📅</div>
+              <div className="text-xs font-bold">Emploi du Temps</div>
+            </Link>
+            <Link to="/courses" className="p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all text-center group">
+              <div className="text-blue-300 font-bold text-xl mb-1 group-hover:scale-110 transition-transform">📚</div>
+              <div className="text-xs font-bold">Mes Matières &amp; Classes</div>
+            </Link>
+            <Link to="/grades" className="p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all text-center group">
+              <div className="text-emerald-300 font-bold text-xl mb-1 group-hover:scale-110 transition-transform">📝</div>
+              <div className="text-xs font-bold">Saisie des Notes</div>
+            </Link>
+            <Link to="/attendance" className="p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all text-center group">
+              <div className="text-rose-300 font-bold text-xl mb-1 group-hover:scale-110 transition-transform">✋</div>
+              <div className="text-xs font-bold">Faire l'Appel</div>
+            </Link>
+            <Link to="/pointage" className="p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all text-center group">
+              <div className="text-amber-300 font-bold text-xl mb-1 group-hover:scale-110 transition-transform">⏱️</div>
+              <div className="text-xs font-bold">Pointage &amp; Heures</div>
+            </Link>
+            <Link to="/finance" className="p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all text-center group">
+              <div className="text-purple-300 font-bold text-xl mb-1 group-hover:scale-110 transition-transform">💵</div>
+              <div className="text-xs font-bold">Mon Salaire &amp; Paie</div>
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Alertes actives */}
       {(stats.pending_absences > 0 || stats.pending_pointages > 0 || stats.unpaid_fees > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
