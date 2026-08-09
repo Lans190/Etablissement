@@ -41,6 +41,8 @@ class CustomUser(AbstractUser):
     # RH et Rémunération
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name=_("Taux horaire (FCFA/h)"))
     base_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name=_("Salaire de base (FCFA)"))
+    allowances = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name=_("Primes & Indemnités (FCFA)"))
+    deductions = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name=_("Cotisations & Déductions (FCFA)"))
 
     def __str__(self):
         return f"{self.get_full_name()} ({self.get_role_display()})"

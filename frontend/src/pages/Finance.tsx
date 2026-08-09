@@ -34,9 +34,12 @@ export default function Finance() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showRateModal, setShowRateModal] = useState(false);
   
+  const [selectedClassroomFilter, setSelectedClassroomFilter] = useState('ALL');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'ALL' | 'PAID' | 'PARTIAL' | 'UNPAID'>('ALL');
+  
   const [selectedAlloc, setSelectedAlloc] = useState<any>(null);
   const [selectedTeacherForRate, setSelectedTeacherForRate] = useState<any>(null);
-  const [rateData, setRateData] = useState({ hourly_rate: '', base_salary: '' });
+  const [rateData, setRateData] = useState({ hourly_rate: '', base_salary: '', allowances: '', deductions: '' });
   
   const [paymentData, setPaymentData] = useState({
     amount_paid: '',
@@ -106,7 +109,9 @@ export default function Finance() {
     setSelectedTeacherForRate(teacher);
     setRateData({
       hourly_rate: teacher.hourly_rate || '0',
-      base_salary: teacher.base_salary || '0'
+      base_salary: teacher.base_salary || '0',
+      allowances: teacher.allowances || '0',
+      deductions: teacher.deductions || '0'
     });
     setShowRateModal(true);
   };
@@ -119,15 +124,17 @@ export default function Finance() {
       const payload = new FormData();
       payload.append('hourly_rate', rateData.hourly_rate || '0');
       payload.append('base_salary', rateData.base_salary || '0');
+      payload.append('allowances', rateData.allowances || '0');
+      payload.append('deductions', rateData.deductions || '0');
       await api.patch(`auth/users/${selectedTeacherForRate.id}/`, payload, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      alert("Taux horaire et salaire de base mis à jour avec succès !");
+      alert("Paramètres salariaux enregistrés avec succès !");
       setShowRateModal(false);
       setSelectedTeacherForRate(null);
       await fetchData();
     } catch (error) {
-      alert("Erreur lors de la mise à jour du taux horaire.");
+      alert("Erreur lors de la mise à jour des paramètres salariaux.");
     } finally {
       setSubmitting(false);
     }
@@ -309,9 +316,31 @@ export default function Finance() {
     }
   };
 
-  const filteredAllocations = allocations.filter((a: any) => {
-    const matchesSearch = a.student_name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
+  // Filtrage par Classe et Statut de Paiement (Payé, Acompte, Impayé)
+  const classAllocations = allocations.filter((a: any) => {
+    if (selectedClassroomFilter === 'ALL') return true;
+    return a.classroom_id?.toString() === selectedClassroomFilter || a.classroom_name === selectedClassroomFilter;
+  });
+
+  const paidAllocationsCount = classAllocations.filter((a: any) => a.is_paid || parseFloat(a.balance || 0) <= 0).length;
+  const partialAllocationsCount = classAllocations.filter((a: any) => !a.is_paid && parseFloat(a.amount_paid || 0) > 0 && parseFloat(a.balance || 0) > 0).length;
+  const unpaidAllocationsCount = classAllocations.filter((a: any) => !a.is_paid && parseFloat(a.amount_paid || 0) === 0).length;
+
+  const filteredAllocations = classAllocations.filter((a: any) => {
+    const matchesSearch = (a.student_name || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const bal = parseFloat(a.balance || 0);
+    const paid = parseFloat(a.amount_paid || 0);
+    const isFullyPaid = a.is_paid || bal <= 0;
+    const isPartial = !isFullyPaid && paid > 0 && bal > 0;
+    const isUnpaid = !isFullyPaid && paid === 0;
+
+    let matchesStatus = true;
+    if (paymentStatusFilter === 'PAID') matchesStatus = isFullyPaid;
+    if (paymentStatusFilter === 'PARTIAL') matchesStatus = isPartial;
+    if (paymentStatusFilter === 'UNPAID') matchesStatus = isUnpaid;
+
+    return matchesSearch && matchesStatus;
   });
 
   // Calculs Globaux
@@ -440,59 +469,134 @@ export default function Finance() {
 
             {incomeSubTab === 'school_fees' ? (
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden overflow-x-auto">
-                     <div className="p-6 border-b border-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/30">
-                        <h3 className="font-bold text-slate-900">Élèves Redevables</h3>
-                        <div className="flex items-center space-x-2">
-                           <Search className="w-4 h-4 text-slate-400" />
-                           <input 
-                              type="text" 
-                              placeholder="Rechercher élève..." 
-                              className="text-xs border rounded-lg px-2 py-1 outline-none"
-                              value={searchTerm}
-                              onChange={e => setSearchTerm(e.target.value)}
-                           />
+                  <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                     {/* Barre de Filtre par Classe & Statut de Paiement */}
+                     <div className="p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                           <div className="flex items-center space-x-2">
+                              <span className="text-xs font-bold text-slate-500 uppercase">Filtrer par Classe :</span>
+                              <select 
+                                 className="text-xs border rounded-xl px-3 py-2 outline-none font-bold bg-white text-slate-800 shadow-sm"
+                                 value={selectedClassroomFilter}
+                                 onChange={e => setSelectedClassroomFilter(e.target.value)}
+                              >
+                                 <option value="ALL">🏫 Toutes les Classes ({allocations.length} élèves)</option>
+                                 {classrooms.map((c: any) => (
+                                    <option key={c.id} value={c.id.toString()}>{c.name}</option>
+                                 ))}
+                              </select>
+                           </div>
+                           <div className="flex items-center space-x-2">
+                              <Search className="w-4 h-4 text-slate-400" />
+                              <input 
+                                 type="text" 
+                                 placeholder="Rechercher élève..." 
+                                 className="text-xs border rounded-xl px-3 py-1.5 outline-none font-semibold bg-white"
+                                 value={searchTerm}
+                                 onChange={e => setSearchTerm(e.target.value)}
+                              />
+                           </div>
+                        </div>
+
+                        {/* Onglets Filtres Statut Paiement (Tous, Payé, Acompte, Impayé) */}
+                        <div className="flex flex-wrap gap-2 pt-1">
+                           <button
+                              onClick={() => setPaymentStatusFilter('ALL')}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${paymentStatusFilter === 'ALL' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+                           >
+                              Tous ({classAllocations.length})
+                           </button>
+                           <button
+                              onClick={() => setPaymentStatusFilter('PAID')}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${paymentStatusFilter === 'PAID' ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'}`}
+                           >
+                              🟢 Solde Payé ({paidAllocationsCount})
+                           </button>
+                           <button
+                              onClick={() => setPaymentStatusFilter('PARTIAL')}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${paymentStatusFilter === 'PARTIAL' ? 'bg-amber-500 text-white shadow-md' : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'}`}
+                           >
+                              🟡 Acompte / Partiel ({partialAllocationsCount})
+                           </button>
+                           <button
+                              onClick={() => setPaymentStatusFilter('UNPAID')}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${paymentStatusFilter === 'UNPAID' ? 'bg-rose-600 text-white shadow-md' : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'}`}
+                           >
+                              🔴 Non Payé / Impayé ({unpaidAllocationsCount})
+                           </button>
                         </div>
                      </div>
+
                      <div className="max-h-[500px] overflow-auto">
                         <table className="w-full text-left">
                            <thead className="bg-slate-50 sticky top-0">
                               <tr>
-                                 <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase">Élève</th>
+                                 <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase">Élève &amp; Classe</th>
+                                 <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase">Statut Paiement</th>
                                  <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase">Frais</th>
-                                 <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase">Reste</th>
+                                 <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase">Reste Dû</th>
                                  <th className="px-6 py-3 text-right text-[10px] font-bold text-slate-400 uppercase">Action</th>
                               </tr>
                            </thead>
                            <tbody className="divide-y divide-slate-50">
-                              {filteredAllocations.map((a: any) => (
-                                 <tr key={a.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-4">
-                                       <div className="text-sm font-bold text-slate-900">{a.student_name}</div>
-                                       <div className="text-[10px] text-slate-400">{a.classroom_name}</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-xs text-slate-600">{a.fee_type_name}</td>
-                                    <td className="px-6 py-4 text-sm font-bold text-red-600">{parseFloat(a.balance).toLocaleString()} F</td>
-                                    <td className="px-6 py-4 text-right space-x-2">
-                                       <Button 
-                                          size="sm" 
-                                          variant="outline"
-                                          className="text-[10px] h-8"
-                                          onClick={() => { setSelectedAlloc(a); setShowDetailsModal(true); }}
-                                       >
-                                          <Eye className="w-3.5 h-3.5 mr-1" /> Détails
-                                       </Button>
-                                       <Button 
-                                          size="sm" 
-                                          className="text-[10px] h-8 bg-slate-900" 
-                                          disabled={a.is_paid}
-                                          onClick={() => { setSelectedAlloc(a); setShowPaymentModal(true); }}
-                                       >
-                                          Encaisser
-                                       </Button>
+                              {filteredAllocations.length === 0 ? (
+                                 <tr>
+                                    <td colSpan={5} className="px-6 py-10 text-center text-xs text-slate-400 italic">
+                                       Aucun élève ne correspond à ce critère de recherche.
                                     </td>
                                  </tr>
-                              ))}
+                              ) : (
+                                 filteredAllocations.map((a: any) => {
+                                    const bal = parseFloat(a.balance || 0);
+                                    const paid = parseFloat(a.amount_paid || 0);
+                                    const isPaid = a.is_paid || bal <= 0;
+                                    const isPartial = !isPaid && paid > 0 && bal > 0;
+                                    
+                                    return (
+                                       <tr key={a.id} className="hover:bg-slate-50 transition-colors">
+                                          <td className="px-6 py-4">
+                                             <div className="text-sm font-bold text-slate-900">{a.student_name}</div>
+                                             <div className="text-[10px] font-bold text-slate-400">{a.classroom_name}</div>
+                                          </td>
+                                          <td className="px-6 py-4">
+                                             {isPaid ? (
+                                                <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                   🟢 Solde Payé
+                                                </span>
+                                             ) : isPartial ? (
+                                                <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                                                   🟡 Acompte ({paid.toLocaleString()} F)
+                                                </span>
+                                             ) : (
+                                                <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                                                   🔴 Non Payé
+                                                </span>
+                                             )}
+                                          </td>
+                                          <td className="px-6 py-4 text-xs text-slate-600 font-medium">{a.fee_type_name}</td>
+                                          <td className="px-6 py-4 text-sm font-bold text-rose-600">{bal.toLocaleString()} F</td>
+                                          <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                                             <Button 
+                                                size="sm" 
+                                                variant="outline"
+                                                className="text-[10px] h-8"
+                                                onClick={() => { setSelectedAlloc(a); setShowDetailsModal(true); }}
+                                             >
+                                                <Eye className="w-3.5 h-3.5 mr-1" /> Détails
+                                             </Button>
+                                             <Button 
+                                                size="sm" 
+                                                className="text-[10px] h-8 bg-slate-900" 
+                                                disabled={isPaid}
+                                                onClick={() => { setSelectedAlloc(a); setShowPaymentModal(true); }}
+                                             >
+                                                Encaisser
+                                             </Button>
+                                          </td>
+                                       </tr>
+                                    );
+                                 })
+                              )}
                            </tbody>
                         </table>
                      </div>
@@ -741,14 +845,16 @@ export default function Finance() {
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase">Enseignant</th>
-                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Salaire Base Fixe</th>
-                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Taux Horaire (FCFA/h)</th>
-                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase text-center">Action Taux Horaire</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Salaire Base</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Taux Horaire</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Primes (+)</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Cotisations (-)</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase text-center">Configuration</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {teachers.length === 0 ? (
-                      <tr><td colSpan={4} className="px-4 py-6 text-center text-xs text-slate-400 italic">Aucun enseignant enregistré dans le système.</td></tr>
+                      <tr><td colSpan={6} className="px-4 py-6 text-center text-xs text-slate-400 italic">Aucun enseignant enregistré dans le système.</td></tr>
                     ) : (
                       teachers.map((t: any) => (
                         <tr key={t.id} className="hover:bg-slate-50 transition-colors">
@@ -760,11 +866,17 @@ export default function Finance() {
                             {parseFloat(t.base_salary || 0).toLocaleString()} F
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-black text-indigo-600">
-                            {parseFloat(t.hourly_rate || 0).toLocaleString()} F / h
+                            {parseFloat(t.hourly_rate || 0).toLocaleString()} F/h
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm font-bold text-emerald-600">
+                            +{parseFloat(t.allowances || 0).toLocaleString()} F
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm font-bold text-rose-600">
+                            -{parseFloat(t.deductions || 0).toLocaleString()} F
                           </td>
                           <td className="px-4 py-3 text-center">
                             <Button onClick={() => openRateModal(t)} variant="outline" className="text-xs font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50">
-                              ⚙️ Modifier Taux Horaire
+                              ⚙️ Assigner Taux &amp; Cotisations
                             </Button>
                           </td>
                         </tr>
@@ -1139,33 +1251,57 @@ export default function Finance() {
               <button onClick={() => setShowRateModal(false)} className="text-slate-400 hover:text-slate-600"><X /></button>
             </div>
             <form onSubmit={handleSaveRate} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Taux Horaire (FCFA par Heure de cours)</label>
-                <input
-                  required
-                  type="number"
-                  placeholder="ex: 5000"
-                  className="w-full border rounded-xl p-3 outline-none font-black text-xl text-indigo-600 bg-slate-50"
-                  value={rateData.hourly_rate}
-                  onChange={e => setRateData({...rateData, hourly_rate: e.target.value})}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-indigo-700 uppercase mb-1">Taux Horaire (F/h)</label>
+                  <input
+                    required
+                    type="number"
+                    placeholder="ex: 2000"
+                    className="w-full border rounded-xl p-3 outline-none font-black text-lg text-indigo-600 bg-slate-50"
+                    value={rateData.hourly_rate}
+                    onChange={e => setRateData({...rateData, hourly_rate: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Salaire Fixe (FCFA)</label>
+                  <input
+                    required
+                    type="number"
+                    placeholder="ex: 150000"
+                    className="w-full border rounded-xl p-3 outline-none font-bold text-base text-slate-800 bg-slate-50"
+                    value={rateData.base_salary}
+                    onChange={e => setRateData({...rateData, base_salary: e.target.value})}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Salaire de Base Fixe (FCFA)</label>
-                <input
-                  required
-                  type="number"
-                  placeholder="ex: 150000"
-                  className="w-full border rounded-xl p-3 outline-none font-bold text-lg text-slate-800 bg-slate-50"
-                  value={rateData.base_salary}
-                  onChange={e => setRateData({...rateData, base_salary: e.target.value})}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-emerald-700 uppercase mb-1">Primes (+) FCFA</label>
+                  <input
+                    type="number"
+                    placeholder="ex: 25000"
+                    className="w-full border rounded-xl p-3 outline-none font-bold text-base text-emerald-600 bg-emerald-50/50"
+                    value={rateData.allowances}
+                    onChange={e => setRateData({...rateData, allowances: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-rose-700 uppercase mb-1">Cotisations (-) FCFA</label>
+                  <input
+                    type="number"
+                    placeholder="ex: 10000"
+                    className="w-full border rounded-xl p-3 outline-none font-bold text-base text-rose-600 bg-rose-50/50"
+                    value={rateData.deductions}
+                    onChange={e => setRateData({...rateData, deductions: e.target.value})}
+                  />
+                </div>
               </div>
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 text-xs text-amber-800 font-medium">
-                🧮 <strong>Calcul Automatique :</strong> Toute nouvelle fiche de paie générée pour cet enseignant multipliera automatiquement ses heures validées par ce taux horaire + son salaire de base.
+              <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-xs text-indigo-900 font-medium">
+                🧮 <strong>Formule de Paie :</strong> Net = (Heures × {rateData.hourly_rate || 0} F/h) + {rateData.base_salary || 0} F Base + {rateData.allowances || 0} F Primes - {rateData.deductions || 0} F Cotisations.
               </div>
               <Button type="submit" disabled={submitting} className="w-full bg-indigo-600 hover:bg-indigo-700 h-12 rounded-xl text-base font-bold shadow-lg shadow-indigo-200">
-                {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Enregistrer la Grille Salariale"}
+                {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Enregistrer les Paramètres Salariaux"}
               </Button>
             </form>
           </div>

@@ -22,7 +22,7 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'username', 'password', 'first_name', 'last_name', 'email', 'role', 
             'phone_number', 'address', 'matricule', 'cni_number', 'cni_scan', 'school', 
             'school_name', 'school_logo', 'school_address', 'school_phone', 'school_email', 
-            'hourly_rate', 'base_salary', 'children'
+            'hourly_rate', 'base_salary', 'allowances', 'deductions', 'children'
         ]
         extra_kwargs = {
             'password': {'write_only': True, 'required': False}

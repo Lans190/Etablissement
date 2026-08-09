@@ -191,6 +191,8 @@ class PayslipViewSet(viewsets.ModelViewSet):
 
             hourly_rate = float(teacher.hourly_rate or 0)
             base_sal = float(teacher.base_salary or 0)
+            bonus_val = float(teacher.allowances or 0)
+            deductions_val = float(teacher.deductions or 0)
 
             payslip, created = Payslip.objects.get_or_create(
                 school=school,
@@ -201,6 +203,8 @@ class PayslipViewSet(viewsets.ModelViewSet):
                     'hours_worked': float(hours_sum),
                     'hourly_rate': hourly_rate,
                     'base_salary': base_sal,
+                    'bonus': bonus_val,
+                    'deductions': deductions_val,
                     'is_paid': False
                 }
             )
@@ -209,6 +213,8 @@ class PayslipViewSet(viewsets.ModelViewSet):
                 payslip.hours_worked = float(hours_sum)
                 payslip.hourly_rate = hourly_rate
                 payslip.base_salary = base_sal
+                payslip.bonus = bonus_val
+                payslip.deductions = deductions_val
                 payslip.save()
 
             created_count += 1
