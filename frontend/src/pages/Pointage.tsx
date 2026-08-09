@@ -197,7 +197,49 @@ export default function Pointage() {
             </Button>
           )}
         </div>
-      </div>
+      {/* Bannière Calculateur Automatique du Taux Horaire pour Enseignants */}
+      {isTeacher && (
+        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div>
+              <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
+                🧮 Calculateur Automatique du Taux Horaire
+              </span>
+              <h3 className="text-2xl font-black">Mon Estimation Salariale Mensuelle</h3>
+              <p className="text-slate-300 text-xs mt-1">
+                Le montant global de votre rémunération est calculé automatiquement à partir de votre taux horaire et de vos heures validées.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/10 p-4 rounded-2xl backdrop-blur-md">
+              <div className="text-center border-r border-white/10 pr-2">
+                <span className="text-[10px] text-blue-200 font-bold uppercase block">Taux Horaire</span>
+                <span className="text-base font-black text-amber-300">
+                  {parseFloat(userProfile?.hourly_rate || 0).toLocaleString()} F/h
+                </span>
+              </div>
+              <div className="text-center border-r border-white/10 pr-2">
+                <span className="text-[10px] text-blue-200 font-bold uppercase block">Base Fixe</span>
+                <span className="text-base font-black text-white">
+                  {parseFloat(userProfile?.base_salary || 0).toLocaleString()} F
+                </span>
+              </div>
+              <div className="text-center border-r border-white/10 pr-2">
+                <span className="text-[10px] text-blue-200 font-bold uppercase block">Heures Validées</span>
+                <span className="text-base font-black text-emerald-400">
+                  {totalWorkedHours} h
+                </span>
+              </div>
+              <div className="text-center">
+                <span className="text-[10px] text-blue-200 font-bold uppercase block">Net Estimé</span>
+                <span className="text-lg font-black text-emerald-300">
+                  {(parseFloat(userProfile?.base_salary || 0) + (totalWorkedHours * parseFloat(userProfile?.hourly_rate || 0))).toLocaleString()} F
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

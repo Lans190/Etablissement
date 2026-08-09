@@ -21,6 +21,7 @@ export default function Finance() {
   const [payments, setPayments] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [incomes, setIncomes] = useState([]); // Recettes Générales (comme dépenses)
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -31,8 +32,11 @@ export default function Finance() {
   const [showAllocModal, setShowAllocModal] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showRateModal, setShowRateModal] = useState(false);
   
   const [selectedAlloc, setSelectedAlloc] = useState<any>(null);
+  const [selectedTeacherForRate, setSelectedTeacherForRate] = useState<any>(null);
+  const [rateData, setRateData] = useState({ hourly_rate: '', base_salary: '' });
   
   const [paymentData, setPaymentData] = useState({
     amount_paid: '',
@@ -68,7 +72,7 @@ export default function Finance() {
 
   const fetchData = async () => {
     try {
-      const [allocRes, classRes, payRes, expRes, typeRes, incRes, payslipRes] = await Promise.all([
+      const [allocRes, classRes, payRes, expRes, typeRes, incRes, payslipRes, usersRes] = await Promise.all([
         api.get('finance/allocations/'),
         api.get('core/classrooms/'),
         api.get('finance/payments/'),
@@ -76,6 +80,7 @@ export default function Finance() {
         api.get('finance/fee-types/'),
         api.get('finance/incomes/'),
         api.get('finance/payslips/'),
+        api.get('auth/users/'),
       ]);
       setAllocations(allocRes.data);
       setClassrooms(classRes.data);
@@ -84,6 +89,7 @@ export default function Finance() {
       setFeeTypes(typeRes.data);
       setIncomes(incRes.data);
       setPayslips(payslipRes.data);
+      setTeachers(usersRes.data.filter((u: any) => u.role === 'ENSEIGNANT'));
       
       if (classRes.data.length > 0 && !allocData.classroom_id) {
         setAllocData(prev => ({ ...prev, classroom_id: classRes.data[0].id.toString() }));
@@ -93,6 +99,37 @@ export default function Finance() {
       }
     } catch (error) {
       console.error("Erreur de chargement des données financières", error);
+    }
+  };
+
+  const openRateModal = (teacher: any) => {
+    setSelectedTeacherForRate(teacher);
+    setRateData({
+      hourly_rate: teacher.hourly_rate || '0',
+      base_salary: teacher.base_salary || '0'
+    });
+    setShowRateModal(true);
+  };
+
+  const handleSaveRate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTeacherForRate) return;
+    setSubmitting(true);
+    try {
+      const payload = new FormData();
+      payload.append('hourly_rate', rateData.hourly_rate || '0');
+      payload.append('base_salary', rateData.base_salary || '0');
+      await api.patch(`auth/users/${selectedTeacherForRate.id}/`, payload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert("Taux horaire et salaire de base mis à jour avec succès !");
+      setShowRateModal(false);
+      setSelectedTeacherForRate(null);
+      await fetchData();
+    } catch (error) {
+      alert("Erreur lors de la mise à jour du taux horaire.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -684,6 +721,61 @@ export default function Finance() {
             </div>
           )}
 
+          {/* Calculateur Automatique de Taux Horaire & Grille Salariale Enseignants */}
+          {!isTeacher && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 border-slate-100">
+                <div>
+                  <h4 className="text-lg font-black text-slate-900 flex items-center">
+                    <span className="p-2 bg-indigo-50 text-indigo-600 rounded-xl mr-2">🧮</span>
+                    Calculateur Automatique du Taux Horaire &amp; Grille Salariale
+                  </h4>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Formule de calcul automatique : <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">Net à Payer = Base Fixe + (Heures Validées × Taux Horaire FCFA/h)</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase">Enseignant</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Salaire Base Fixe</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase text-right">Taux Horaire (FCFA/h)</th>
+                      <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase text-center">Action Taux Horaire</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {teachers.length === 0 ? (
+                      <tr><td colSpan={4} className="px-4 py-6 text-center text-xs text-slate-400 italic">Aucun enseignant enregistré dans le système.</td></tr>
+                    ) : (
+                      teachers.map((t: any) => (
+                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 font-bold text-sm text-slate-900">
+                            {t.first_name} {t.last_name}
+                            <span className="block text-[10px] text-slate-400 font-mono">@{t.username}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm font-bold text-slate-700">
+                            {parseFloat(t.base_salary || 0).toLocaleString()} F
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm font-black text-indigo-600">
+                            {parseFloat(t.hourly_rate || 0).toLocaleString()} F / h
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Button onClick={() => openRateModal(t)} variant="outline" className="text-xs font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                              ⚙️ Modifier Taux Horaire
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Payslips Table */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-5 border-b bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1035,6 +1127,49 @@ export default function Finance() {
                </form>
             </div>
          </div>
+      {/* Modal Modification Taux Horaire & Salaire Enseignant */}
+      {showRateModal && selectedTeacherForRate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
+            <div className="p-6 border-b bg-indigo-50 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-black text-indigo-900">Configurer Taux Horaire &amp; Salaire</h3>
+                <p className="text-xs text-indigo-600 font-bold mt-0.5">{selectedTeacherForRate.first_name} {selectedTeacherForRate.last_name}</p>
+              </div>
+              <button onClick={() => setShowRateModal(false)} className="text-slate-400 hover:text-slate-600"><X /></button>
+            </div>
+            <form onSubmit={handleSaveRate} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Taux Horaire (FCFA par Heure de cours)</label>
+                <input
+                  required
+                  type="number"
+                  placeholder="ex: 5000"
+                  className="w-full border rounded-xl p-3 outline-none font-black text-xl text-indigo-600 bg-slate-50"
+                  value={rateData.hourly_rate}
+                  onChange={e => setRateData({...rateData, hourly_rate: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Salaire de Base Fixe (FCFA)</label>
+                <input
+                  required
+                  type="number"
+                  placeholder="ex: 150000"
+                  className="w-full border rounded-xl p-3 outline-none font-bold text-lg text-slate-800 bg-slate-50"
+                  value={rateData.base_salary}
+                  onChange={e => setRateData({...rateData, base_salary: e.target.value})}
+                />
+              </div>
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 text-xs text-amber-800 font-medium">
+                🧮 <strong>Calcul Automatique :</strong> Toute nouvelle fiche de paie générée pour cet enseignant multipliera automatiquement ses heures validées par ce taux horaire + son salaire de base.
+              </div>
+              <Button type="submit" disabled={submitting} className="w-full bg-indigo-600 hover:bg-indigo-700 h-12 rounded-xl text-base font-bold shadow-lg shadow-indigo-200">
+                {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Enregistrer la Grille Salariale"}
+              </Button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

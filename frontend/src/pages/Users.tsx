@@ -19,6 +19,8 @@ export default function Users() {
     role: 'ELEVE',
     phone_number: '',
     cni_number: '',
+    hourly_rate: '',
+    base_salary: '',
     children: [] as number[]
   });
 
@@ -54,6 +56,10 @@ export default function Users() {
     payload.append('role', formData.role);
     payload.append('phone_number', formData.phone_number);
     payload.append('cni_number', formData.cni_number);
+    if (formData.role === 'ENSEIGNANT') {
+      payload.append('hourly_rate', formData.hourly_rate || '0');
+      payload.append('base_salary', formData.base_salary || '0');
+    }
 
     // Only send children IDs that are valid ELEVE users (defensive programming)
     const validStudentIds = new Set(users.filter((u: any) => u.role === 'ELEVE').map((u: any) => u.id));
@@ -91,6 +97,8 @@ export default function Users() {
         role: 'ELEVE',
         phone_number: '',
         cni_number: '',
+        hourly_rate: '',
+        base_salary: '',
         children: []
       });
       fetchUsers();
@@ -119,6 +127,8 @@ export default function Users() {
       role: user.role,
       phone_number: user.phone_number || '',
       cni_number: user.cni_number || '',
+      hourly_rate: user.hourly_rate || '',
+      base_salary: user.base_salary || '',
       children: safeChildren
     });
     setCniScanFile(null);
@@ -254,17 +264,39 @@ export default function Users() {
                       onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2 ml-1">Numéro de CNI</label>
-                    <input
-                      type="text"
-                      placeholder="ex: 1755199800122"
-                      className="w-full border-none bg-slate-100 rounded-2xl p-3.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500"
-                      value={formData.cni_number}
-                      onChange={(e) => setFormData({...formData, cni_number: e.target.value})}
-                    />
-                  </div>
                 </div>
+
+                {/* Grille Salariale pour les enseignants */}
+                {formData.role === 'ENSEIGNANT' && (
+                  <div className="col-span-2 bg-blue-50/60 p-4 rounded-2xl border border-blue-100 space-y-3">
+                    <p className="text-xs font-black text-blue-900 uppercase flex items-center">
+                      <GraduationCap className="w-4 h-4 mr-1.5 text-blue-600" />
+                      Paramètres Salariaux de l'Enseignant
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-blue-700 uppercase mb-1">Taux Horaire (FCFA/Heure)</label>
+                        <input
+                          type="number"
+                          placeholder="ex: 5000"
+                          className="w-full border-none bg-white rounded-xl p-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                          value={formData.hourly_rate}
+                          onChange={(e) => setFormData({...formData, hourly_rate: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-blue-700 uppercase mb-1">Salaire de Base Fixe (FCFA)</label>
+                        <input
+                          type="number"
+                          placeholder="ex: 150000"
+                          className="w-full border-none bg-white rounded-xl p-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                          value={formData.base_salary}
+                          onChange={(e) => setFormData({...formData, base_salary: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Scan CNI */}
                 <div className="col-span-2">
