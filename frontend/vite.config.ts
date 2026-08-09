@@ -11,6 +11,16 @@ export default defineConfig({
     },
   },
   build: {
-    target: 'es2020'
+    target: 'es2020',
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        },
+      },
+    },
   }
 })
